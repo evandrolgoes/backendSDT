@@ -37,12 +37,11 @@ class EconomicGroup(TenantAwareModel):
 
 
 class SubGroup(TenantAwareModel):
-    grupo = models.ForeignKey(EconomicGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="subgrupos")
     subgrupo = models.CharField(max_length=120, null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "grupo", "subgrupo"], name="uq_subgroup_name_group")]
-        indexes = [models.Index(fields=["tenant", "grupo"])]
+        constraints = [models.UniqueConstraint(fields=["tenant", "subgrupo"], name="uq_subgroup_name_tenant")]
+        indexes = [models.Index(fields=["tenant", "subgrupo"])]
 
     def __str__(self):
         return self.subgrupo

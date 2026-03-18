@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
@@ -66,7 +68,6 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     cif_fob = models.CharField(max_length=20, blank=True)
     compra_venda = models.CharField(max_length=20, blank=True)
     contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
-    contrato_bolsa = models.CharField(max_length=120, blank=True)
     cotacao_bolsa_ref = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     cultura_produto = models.CharField(max_length=100, blank=True)
     data_entrega = models.DateField(null=True, blank=True)
@@ -78,7 +79,7 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     objetivo_venda_dolarizada = models.CharField(max_length=120, blank=True)
     pf_paf = models.CharField(max_length=20, blank=True)
     preco = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    unidade_contrato = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    unidade_contrato = models.CharField(max_length=20, null=True, blank=True)
     volume_fisico = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
 
     class Meta:
@@ -86,3 +87,46 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
     def __str__(self):
         return f"Venda fisico {self.id}"
+
+    def save(self, *args, **kwargs):
+        if self.volume_fisico is not None and self.preco is not None:
+            self.faturamento_total_contrato = Decimal(self.volume_fisico) * Decimal(self.preco)
+        else:
+            self.faturamento_total_contrato = None
+        super().save(*args, **kwargs)
+
+
+class PhysicalPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
+    fazer_frente_com = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
+    volume = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    unidade = models.CharField(max_length=20, blank=True)
+    data_pagamento = models.DateField(null=True, blank=True)
+    descricao = models.TextField(blank=True)
+    contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
+
+    class Meta:
+        ordering = ["-data_pagamento", "-created_at"]
+
+    def __str__(self):
+        return self.descricao[:80] or f"Pgto fisico {self.id}"
+
+
+class CashPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
+    fazer_frente_com = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
+    volume = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    moeda = models.CharField(max_length=20, blank=True)
+    data_pagamento = models.DateField(null=True, blank=True)
+    descricao = models.TextField(blank=True)
+    contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
+
+    class Meta:
+        ordering = ["-data_pagamento", "-created_at"]
+
+    def __str__(self):
+        return self.descricao[:80] or f"Pgto caixa {self.id}"

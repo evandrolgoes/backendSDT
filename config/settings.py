@@ -1,14 +1,38 @@
+import os
 from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
-from decouple import Csv, config
+from decouple import AutoConfig, Csv, Config, RepositoryEnv, UndefinedValueError
 
 
 def cast_bool(value):
     return str(value).strip().lower() in {"1", "true", "yes", "on", "debug"}
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env_file = os.environ.get("ENV_FILE")
+if env_file:
+    env_path = Path(env_file)
+    if not env_path.is_absolute():
+        env_path = BASE_DIR / env_path
+    env_repository = RepositoryEnv(str(env_path))
+    fallback_config = AutoConfig(search_path=BASE_DIR)
+
+    def config(name, default=None, cast=None):
+        if name in env_repository.data:
+            value = env_repository.data[name]
+            if cast:
+                return cast(value)
+            return value
+        if default is None:
+            try:
+                return fallback_config(name, cast=cast) if cast else fallback_config(name)
+            except UndefinedValueError:
+                raise
+        return fallback_config(name, default=default, cast=cast) if cast else fallback_config(name, default=default)
+else:
+    config = AutoConfig(search_path=BASE_DIR)
 
 SECRET_KEY = config("SECRET_KEY", default="unsafe-secret-key")
 DEBUG = config("DEBUG", cast=cast_bool, default=True)
@@ -42,7 +66,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -50,6 +73,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+if not DEBUG:
+    MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 ROOT_URLCONF = "config.urls"
 
@@ -74,11 +100,15 @@ ASGI_APPLICATION = "config.asgi.application"
 DATABASE_URL = config("DATABASE_URL", default="")
 
 if DATABASE_URL:
+    database_config = {
+        "conn_max_age": 600,
+    }
+    if not DATABASE_URL.startswith("sqlite"):
+        database_config["ssl_require"] = not DEBUG
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=not DEBUG,
+            **database_config,
         )
     }
 else:
@@ -105,10 +135,9 @@ TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -143,9 +172,21 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://127\.0\.0\.1:\d+$",
 ]
 
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+ACCESS_REQUEST_NOTIFY_EMAIL = config("ACCESS_REQUEST_NOTIFY_EMAIL", default="evandrogoes@agrosaldaterra.com.br")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@sdt.local")
+EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = config("EMAIL_HOST", default="localhost")
+EMAIL_PORT = config("EMAIL_PORT", cast=int, default=25)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=cast_bool, default=False)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=cast_bool, default=False)
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 if not DEBUG:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=cast_bool, default=False)

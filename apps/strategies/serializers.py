@@ -27,4 +27,4 @@ class CropBoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = CropBoard
         fields = "__all__"
-        read_only_fields = ["created_at", "updated_at", "created_by"]
+        read_only_fields = ["created_at", "updated_at", "created_by", "producao_total"]

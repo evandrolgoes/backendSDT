@@ -19,9 +19,9 @@ class EconomicGroupViewSet(TenantScopedModelViewSet):
 
 
 class SubGroupViewSet(TenantScopedModelViewSet):
-    queryset = SubGroup.objects.select_related("tenant", "grupo").all()
+    queryset = SubGroup.objects.select_related("tenant").all()
     serializer_class = SubGroupSerializer
-    filterset_fields = ["tenant", "grupo"]
+    filterset_fields = ["tenant"]
     search_fields = ["subgrupo"]
 
 

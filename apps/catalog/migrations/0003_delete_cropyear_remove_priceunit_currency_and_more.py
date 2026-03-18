@@ -13,16 +13,8 @@ class Migration(migrations.Migration):
         migrations.DeleteModel(
             name='CropYear',
         ),
-        migrations.RemoveField(
-            model_name='priceunit',
-            name='currency',
-        ),
         migrations.DeleteModel(
             name='InvestmentType',
-        ),
-        migrations.RemoveField(
-            model_name='priceunit',
-            name='unit',
         ),
         migrations.AlterModelOptions(
             name='crop',

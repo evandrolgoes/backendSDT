@@ -1,11 +1,12 @@
-from rest_framework import permissions, viewsets
+from rest_framework import parsers, permissions, viewsets
 
 from apps.core.permissions import IsMasterAdmin
 
-from .models import Crop, Currency, Exchange, MarketInstrument, PriceSource, PriceUnit, Unit
+from .models import Crop, Currency, DerivativeOperationName, Exchange, MarketInstrument, PriceSource, PriceUnit, Unit
 from .serializers import (
     CropSerializer,
     CurrencySerializer,
+    DerivativeOperationNameSerializer,
     ExchangeSerializer,
     MarketInstrumentSerializer,
     PriceSourceSerializer,
@@ -28,6 +29,7 @@ class CropViewSet(viewsets.ModelViewSet):
     serializer_class = CropSerializer
     permission_classes = [AdminWriteCatalogPermission]
     search_fields = ["cultura"]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
 
 class MarketInstrumentViewSet(viewsets.ModelViewSet):
@@ -69,5 +71,12 @@ class PriceUnitViewSet(viewsets.ModelViewSet):
 class ExchangeViewSet(viewsets.ModelViewSet):
     queryset = Exchange.objects.all()
     serializer_class = ExchangeSerializer
+    permission_classes = [AdminWriteCatalogPermission]
+    search_fields = ["nome"]
+
+
+class DerivativeOperationNameViewSet(viewsets.ModelViewSet):
+    queryset = DerivativeOperationName.objects.all()
+    serializer_class = DerivativeOperationNameSerializer
     permission_classes = [AdminWriteCatalogPermission]
     search_fields = ["nome"]

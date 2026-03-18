@@ -12,10 +12,11 @@ class TenantAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
-    list_display = ("username", "email", "full_name", "tenant", "is_active", "is_staff")
+    list_display = ("username", "email", "full_name", "tenant", "access_status", "is_active", "is_staff")
     fieldsets = DjangoUserAdmin.fieldsets + (
-        ("SDT Position", {"fields": ("tenant", "full_name", "phone")}),
+        ("SDT Position", {"fields": ("tenant", "full_name", "phone", "access_status", "assigned_groups", "assigned_subgroups")}),
     )
+    filter_horizontal = ("assigned_groups", "assigned_subgroups", "groups", "user_permissions")
 
 
 admin.site.register(Role)

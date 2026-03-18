@@ -65,22 +65,6 @@ class Migration(migrations.Migration):
                 'ordering': ['-data_report', '-created_at'],
             },
         ),
-        migrations.RemoveField(
-            model_name='hedgeallocation',
-            name='allocated_unit',
-        ),
-        migrations.RemoveField(
-            model_name='hedgeallocation',
-            name='derivative_operation',
-        ),
-        migrations.RemoveField(
-            model_name='hedgeallocation',
-            name='physical_sale',
-        ),
-        migrations.RemoveField(
-            model_name='hedgeallocation',
-            name='tenant',
-        ),
         migrations.AlterModelOptions(
             name='physicalsale',
             options={'ordering': ['-data_negociacao', '-created_at']},

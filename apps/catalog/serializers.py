@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Crop, Currency, Exchange, MarketInstrument, PriceSource, PriceUnit, Unit
+from .models import Crop, Currency, DerivativeOperationName, Exchange, MarketInstrument, PriceSource, PriceUnit, Unit
 
 
 class CropSerializer(serializers.ModelSerializer):
@@ -42,4 +42,10 @@ class PriceUnitSerializer(serializers.ModelSerializer):
 class ExchangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exchange
+        fields = "__all__"
+
+
+class DerivativeOperationNameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DerivativeOperationName
         fields = "__all__"

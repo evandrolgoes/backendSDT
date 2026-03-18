@@ -1,18 +1,28 @@
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.accounts.views import LoginView, TenantViewSet, UserViewSet, me
+from apps.accounts.views import AccessRequestView, ForgotPasswordView, LoginView, ResetPasswordConfirmView, TenantViewSet, UserViewSet, me
 from apps.auditing.views import AttachmentViewSet, AuditLogViewSet
-from apps.catalog.views import CropViewSet, CurrencyViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
+from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperationNameViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
-from apps.derivatives.views import DerivativeOperationViewSet
+from apps.derivatives.views import DerivativeOperationViewSet, derivative_contracts
 from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
-from apps.physical.views import ActualCostViewSet, BudgetCostViewSet, PhysicalQuoteViewSet, PhysicalSaleViewSet
+from apps.physical.views import (
+    ActualCostViewSet,
+    BudgetCostViewSet,
+    CashPaymentViewSet,
+    PhysicalPaymentViewSet,
+    PhysicalQuoteViewSet,
+    PhysicalSaleViewSet,
+)
 from apps.risk.views import ExposurePositionViewSet
-from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet
+from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
 
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
@@ -25,6 +35,7 @@ router.register("currencies", CurrencyViewSet, basename="currency")
 router.register("units", UnitViewSet, basename="unit")
 router.register("price-units", PriceUnitViewSet, basename="price-unit")
 router.register("exchanges", ExchangeViewSet, basename="exchange")
+router.register("derivative-operation-names", DerivativeOperationNameViewSet, basename="derivative-operation-name")
 router.register("seasons", CropSeasonViewSet, basename="season")
 router.register("counterparties", CounterpartyViewSet, basename="counterparty")
 router.register("brokers", BrokerViewSet, basename="broker")
@@ -34,6 +45,8 @@ router.register("physical-quotes", PhysicalQuoteViewSet, basename="physical-quot
 router.register("budget-costs", BudgetCostViewSet, basename="budget-cost")
 router.register("actual-costs", ActualCostViewSet, basename="actual-cost")
 router.register("physical-sales", PhysicalSaleViewSet, basename="physical-sale")
+router.register("physical-payments", PhysicalPaymentViewSet, basename="physical-payment")
+router.register("cash-payments", CashPaymentViewSet, basename="cash-payment")
 router.register("derivative-operations", DerivativeOperationViewSet, basename="derivative-operation")
 router.register("strategies", StrategyViewSet, basename="strategy")
 router.register("strategy-triggers", StrategyTriggerViewSet, basename="strategy-trigger")
@@ -50,7 +63,17 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
     path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
+    path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
+    path("api/localidades/estados/", ibge_states, name="ibge_states"),
+    path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/auth/login/", LoginView.as_view(), name="login"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/me/", me, name="me"),
+    path("api/auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
+    path("api/auth/reset-password-confirm/", ResetPasswordConfirmView.as_view(), name="reset_password_confirm"),
+    path("api/auth/request-access/", AccessRequestView.as_view(), name="request_access"),
 ]
+
+if settings.DEBUG:
+    urlpatterns += staticfiles_urlpatterns()
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

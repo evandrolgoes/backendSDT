@@ -18,10 +18,17 @@ class Tenant(TimeStampedModel):
 
 
 class User(AbstractUser):
+    class AccessStatus(models.TextChoices):
+        PENDING = "pending", "Pendente"
+        ACTIVE = "active", "Ativo"
+
     tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.SET_NULL, related_name="users")
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30, blank=True)
+    access_status = models.CharField(max_length=20, choices=AccessStatus.choices, default=AccessStatus.ACTIVE)
+    assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="assigned_users")
+    assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="assigned_users")
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()
@@ -31,6 +38,10 @@ class User(AbstractUser):
     class Meta:
         ordering = ["username"]
         indexes = [models.Index(fields=["tenant", "username"])]
+
+    def save(self, *args, **kwargs):
+        self.is_active = self.access_status == self.AccessStatus.ACTIVE
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.username

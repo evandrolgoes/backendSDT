@@ -1,12 +1,16 @@
 from datetime import date, datetime
 from decimal import Decimal
+from functools import reduce
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from rest_framework import serializers, viewsets
 
 
 class TenantScopedModelViewSet(viewsets.ModelViewSet):
     tenant_field = "tenant"
+    group_field_candidates = ("grupo", "group", "grupos")
+    subgroup_field_candidates = ("subgrupo", "subgroup", "subgrupos")
 
     def _normalize_log_value(self, value):
         if value is None:
@@ -113,8 +117,59 @@ class TenantScopedModelViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return queryset
         if hasattr(queryset.model, self.tenant_field):
-            return queryset.filter(**{self.tenant_field: user.tenant})
-        return queryset
+            queryset = queryset.filter(**{self.tenant_field: user.tenant})
+        return self._filter_queryset_by_assignments(queryset, user)
+
+    def _available_relation_fields(self, model, candidates, related_model_label):
+        available = []
+        for field_name in candidates:
+            try:
+                field = model._meta.get_field(field_name)
+            except Exception:
+                continue
+            if not field.is_relation:
+                continue
+            remote_model = getattr(field, "related_model", None)
+            if remote_model and remote_model._meta.label == related_model_label:
+                available.append(field_name)
+        return available
+
+    def _build_assignment_queries(self, model, field_names, allowed_ids):
+        queries = []
+        if not allowed_ids:
+            return queries
+        for field_name in field_names:
+            model_field = model._meta.get_field(field_name)
+            if model_field.many_to_many:
+                queries.append(Q(**{f"{field_name}__id__in": allowed_ids}))
+            else:
+                queries.append(Q(**{f"{field_name}_id__in": allowed_ids}))
+        return queries
+
+    def _filter_queryset_by_assignments(self, queryset, user):
+        model = queryset.model
+        allowed_group_ids = list(user.assigned_groups.values_list("id", flat=True))
+        allowed_subgroup_ids = list(user.assigned_subgroups.values_list("id", flat=True))
+
+        if model._meta.label == "clients.EconomicGroup":
+            return queryset.filter(id__in=allowed_group_ids) if allowed_group_ids else queryset.none()
+        if model._meta.label == "clients.SubGroup":
+            return queryset.filter(id__in=allowed_subgroup_ids) if allowed_subgroup_ids else queryset.none()
+
+        group_fields = self._available_relation_fields(model, self.group_field_candidates, "clients.EconomicGroup")
+        subgroup_fields = self._available_relation_fields(model, self.subgroup_field_candidates, "clients.SubGroup")
+
+        if not group_fields and not subgroup_fields:
+            return queryset
+
+        queries = []
+        queries.extend(self._build_assignment_queries(model, group_fields, allowed_group_ids))
+        queries.extend(self._build_assignment_queries(model, subgroup_fields, allowed_subgroup_ids))
+
+        if not queries:
+            return queryset.none()
+
+        return queryset.filter(reduce(lambda left, right: left | right, queries)).distinct()
 
     def perform_create(self, serializer):
         extra = {}

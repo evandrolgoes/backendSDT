@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 
 from django.contrib.auth import get_user_model
 from apps.accounts.models import Role
-from apps.catalog.models import Crop, Currency, Exchange, PriceSource, PriceUnit, Unit
+from apps.catalog.models import Crop, Currency, DerivativeOperationName, Exchange, PriceSource, PriceUnit, Unit
 from apps.clients.models import Counterparty, CropSeason, EconomicGroup, SubGroup
 from apps.derivatives.models import DerivativeOperation
 from apps.physical.models import ActualCost, BudgetCost, PhysicalQuote, PhysicalSale
@@ -36,6 +36,9 @@ class Command(BaseCommand):
         for nome in ["B3", "CME"]:
             Exchange.objects.get_or_create(nome=nome)
 
+        for nome in ["Compra Call", "Venda Put", "Venda Call", "Venda Put", "Venda NDF", "Compra NDF"]:
+            DerivativeOperationName.objects.get_or_create(nome=nome)
+
         tenant = User.objects.filter(tenant__isnull=False).values_list("tenant", flat=True).first()
         owner = User.objects.filter(tenant_id=tenant).order_by("is_superuser", "id").last() if tenant else User.objects.first()
 
@@ -52,9 +55,9 @@ class Command(BaseCommand):
         grupo_alpha, _ = EconomicGroup.objects.get_or_create(tenant_id=tenant, grupo="Grupo Alpha")
         grupo_sertao, _ = EconomicGroup.objects.get_or_create(tenant_id=tenant, grupo="Grupo Sertao")
 
-        subgrupo_norte, _ = SubGroup.objects.get_or_create(tenant_id=tenant, grupo=grupo_alpha, subgrupo="Fazenda Norte")
-        subgrupo_sul, _ = SubGroup.objects.get_or_create(tenant_id=tenant, grupo=grupo_alpha, subgrupo="Fazenda Sul")
-        subgrupo_leste, _ = SubGroup.objects.get_or_create(tenant_id=tenant, grupo=grupo_sertao, subgrupo="Unidade Leste")
+        subgrupo_norte, _ = SubGroup.objects.get_or_create(tenant_id=tenant, subgrupo="Fazenda Norte")
+        subgrupo_sul, _ = SubGroup.objects.get_or_create(tenant_id=tenant, subgrupo="Fazenda Sul")
+        subgrupo_leste, _ = SubGroup.objects.get_or_create(tenant_id=tenant, subgrupo="Unidade Leste")
 
         safra_2425, _ = CropSeason.objects.get_or_create(tenant_id=tenant, safra="24/25")
         safra_2526, _ = CropSeason.objects.get_or_create(tenant_id=tenant, safra="25/26")
@@ -163,62 +166,93 @@ class Command(BaseCommand):
 
         derivativo_put, _ = DerivativeOperation.objects.get_or_create(
             tenant_id=tenant,
-            contrato_derivativo="PUT SOJA CME JUL26",
+            cod_operacao_mae="DRV-001",
+            ordem=1,
             defaults={
                 "created_by": owner,
                 "grupo": grupo_alpha,
                 "subgrupo": subgrupo_norte,
                 "cultura": soja,
                 "safra": safra_2425,
-                "cod_operacao_mae": "DRV-001",
-                "compra_venda": "Compra",
+                "bolsa_ref": "CME",
+                "status_operacao": "Em aberto",
                 "contraparte": contraparte_a,
-                "custo_total_montagem": 18250.0,
                 "data_contratacao": "2026-03-05",
                 "data_liquidacao": "2026-07-20",
-                "liquidacao_ajuste_total_moeda_original": 15200.0,
-                "liquidacao_ajuste_total_brl": 87400.0,
-                "liquidacao_dolar_ptax": 5.75,
+                "contrato_derivativo": "PUT SOJA CME JUL26",
+                "dolar_ptax_vencimento": 5.75,
                 "moeda_ou_cmdtye": "Cmdtye",
                 "moeda_unidade": "U$/bus",
                 "nome_da_operacao": "Compra Put",
-                "tipo_derivativo": "Put",
                 "unidade": "bus",
+                "grupo_montagem": "Compra",
+                "tipo_derivativo": "Put",
+                "custo_total_montagem_brl": 18250.0,
+                "ajustes_totais_usd": 15200.0,
                 "volume_financeiro_moeda": "U$",
                 "volume_financeiro_valor_moeda_original": 52000.0,
-                "volume_financeiro_valor_moeda_brl": 299000.0,
                 "volume_fisico": 18000.0,
-                "volume_fisico_unidade_padrao_cultura": 10800.0,
             },
         )
-        DerivativeOperation.objects.get_or_create(
+
+        derivativo_ndf, _ = DerivativeOperation.objects.get_or_create(
             tenant_id=tenant,
-            contrato_derivativo="NDF USD JUL26",
+            cod_operacao_mae="DRV-002",
+            ordem=1,
             defaults={
                 "created_by": owner,
                 "grupo": grupo_sertao,
                 "subgrupo": subgrupo_leste,
                 "cultura": milho,
                 "safra": safra_2526,
-                "cod_operacao_mae": "DRV-002",
-                "compra_venda": "Venda",
+                "bolsa_ref": "B3",
+                "status_operacao": "Em aberto",
                 "contraparte": contraparte_b,
-                "custo_total_montagem": 9800.0,
                 "data_contratacao": "2026-03-08",
                 "data_liquidacao": "2026-08-12",
-                "liquidacao_ajuste_total_moeda_original": 8300.0,
-                "liquidacao_ajuste_total_brl": 47150.0,
-                "liquidacao_dolar_ptax": 5.68,
+                "contrato_derivativo": "NDF USD JUL26",
+                "dolar_ptax_vencimento": 5.68,
                 "moeda_ou_cmdtye": "Moeda",
                 "moeda_unidade": "R$/@",
                 "nome_da_operacao": "Venda NDF",
-                "tipo_derivativo": "NDF",
                 "unidade": "@",
+                "grupo_montagem": "Venda",
+                "tipo_derivativo": "NDF",
+                "custo_total_montagem_brl": 9800.0,
+                "ajustes_totais_usd": 8300.0,
                 "volume_financeiro_moeda": "U$",
                 "volume_financeiro_valor_moeda_original": 43000.0,
-                "volume_financeiro_valor_moeda_brl": 244240.0,
                 "volume_fisico": 9500.0,
-                "volume_fisico_unidade_padrao_cultura": 5700.0,
+            },
+        )
+        DerivativeOperation.objects.get_or_create(
+            tenant_id=tenant,
+            cod_operacao_mae="DRV-002",
+            ordem=2,
+            defaults={
+                "created_by": owner,
+                "grupo": grupo_sertao,
+                "subgrupo": subgrupo_leste,
+                "cultura": milho,
+                "safra": safra_2526,
+                "bolsa_ref": "B3",
+                "status_operacao": "Em aberto",
+                "contraparte": contraparte_b,
+                "data_contratacao": "2026-03-08",
+                "data_liquidacao": "2026-08-12",
+                "contrato_derivativo": "NDF USD JUL26",
+                "dolar_ptax_vencimento": 5.68,
+                "moeda_ou_cmdtye": "Moeda",
+                "moeda_unidade": "R$/@",
+                "nome_da_operacao": "Venda NDF",
+                "unidade": "@",
+                "grupo_montagem": "Compra",
+                "tipo_derivativo": "Call",
+                "custo_total_montagem_brl": 6200.0,
+                "ajustes_totais_usd": 4100.0,
+                "volume_financeiro_moeda": "U$",
+                "volume_financeiro_valor_moeda_original": 43000.0,
+                "volume_fisico": 5000.0,
             },
         )
 
@@ -317,7 +351,7 @@ class Command(BaseCommand):
 
         venda_fisica, _ = PhysicalSale.objects.get_or_create(
             tenant_id=tenant,
-            contrato_bolsa="VF-001",
+            cultura_produto="Soja",
             defaults={
                 "created_by": owner,
                 "cultura": soja,
@@ -334,12 +368,11 @@ class Command(BaseCommand):
                 "data_negociacao": "2026-03-12",
                 "data_pagamento": "2026-04-25",
                 "dolar_de_venda": 5.77,
-                "faturamento_total_contrato": 1145000.0,
                 "moeda_contrato": "R$",
                 "objetivo_venda_dolarizada": "Protecao da margem",
                 "pf_paf": "PF",
                 "preco": 131.8,
-                "unidade_contrato": 1,
+                "unidade_contrato": "sc",
                 "volume_fisico": 8450.0,
             },
         )
@@ -348,7 +381,7 @@ class Command(BaseCommand):
 
         venda_fisica_milho, _ = PhysicalSale.objects.get_or_create(
             tenant_id=tenant,
-            contrato_bolsa="VF-002",
+            cultura_produto="Milho",
             defaults={
                 "created_by": owner,
                 "cultura": milho,
@@ -365,12 +398,11 @@ class Command(BaseCommand):
                 "data_negociacao": "2026-03-14",
                 "data_pagamento": "2026-08-18",
                 "dolar_de_venda": 5.7,
-                "faturamento_total_contrato": 682400.0,
                 "moeda_contrato": "R$",
                 "objetivo_venda_dolarizada": "Caixa de safra",
                 "pf_paf": "PAF",
                 "preco": 70.9,
-                "unidade_contrato": 1,
+                "unidade_contrato": "sc",
                 "volume_fisico": 9620.0,
             },
         )

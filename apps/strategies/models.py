@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
@@ -71,6 +73,7 @@ class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="quadros_safra")
     subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="quadros_safra")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
+    localidade = models.JSONField(default=list, blank=True)
     area = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     bolsa_ref = models.CharField(max_length=50, blank=True)
     monitorar_vc = models.BooleanField(default=False)
@@ -85,3 +88,10 @@ class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
     def __str__(self):
         return f"Quadro safra {self.id}"
+
+    def save(self, *args, **kwargs):
+        if self.area is not None and self.produtividade is not None:
+            self.producao_total = Decimal(self.area) * Decimal(self.produtividade)
+        else:
+            self.producao_total = None
+        super().save(*args, **kwargs)
