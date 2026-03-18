@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 from datetime import timedelta
 from pathlib import Path
 
@@ -8,6 +9,26 @@ from decouple import AutoConfig, Csv, Config, RepositoryEnv, UndefinedValueError
 
 def cast_bool(value):
     return str(value).strip().lower() in {"1", "true", "yes", "on", "debug"}
+
+
+def normalize_host(value):
+    candidate = str(value).strip()
+    if not candidate:
+        return ""
+    if "://" in candidate:
+        parsed = urlparse(candidate)
+        candidate = parsed.netloc or parsed.path
+    candidate = candidate.split("/")[0].strip()
+    return candidate
+
+
+def normalize_hosts(values):
+    normalized = []
+    for value in values:
+        host = normalize_host(value)
+        if host and host not in normalized:
+            normalized.append(host)
+    return normalized
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -38,6 +59,11 @@ SECRET_KEY = config("SECRET_KEY", default="unsafe-secret-key")
 DEBUG = config("DEBUG", cast=cast_bool, default=True)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv(), default="localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", cast=Csv(), default="")
+ALLOWED_HOSTS = normalize_hosts(ALLOWED_HOSTS)
+
+render_external_hostname = normalize_host(os.environ.get("RENDER_EXTERNAL_HOSTNAME", ""))
+if render_external_hostname and render_external_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_external_hostname)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
