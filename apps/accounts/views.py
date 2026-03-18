@@ -11,6 +11,12 @@ from .serializers import LoginSerializer, TenantSerializer, UserSerializer
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
 
+    def get(self, request, *args, **kwargs):
+        return response.Response(
+            {"detail": 'Use POST para autenticar com "username" e "password".'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

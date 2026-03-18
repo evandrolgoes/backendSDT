@@ -6,13 +6,13 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import LoginView, TenantViewSet, UserViewSet, me
 from apps.auditing.views import AttachmentViewSet, AuditLogViewSet
-from apps.catalog.views import CropViewSet, MarketInstrumentViewSet, PriceSourceViewSet, UnitOfMeasureViewSet
+from apps.catalog.views import CropViewSet, CurrencyViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
-from apps.derivatives.views import CashSettlementViewSet, DerivativeLegViewSet, DerivativeOperationViewSet, MarkToMarketSnapshotViewSet
+from apps.derivatives.views import DerivativeOperationViewSet
 from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
-from apps.physical.views import HedgeAllocationViewSet, PhysicalSaleViewSet
+from apps.physical.views import ActualCostViewSet, BudgetCostViewSet, PhysicalQuoteViewSet, PhysicalSaleViewSet
 from apps.risk.views import ExposurePositionViewSet
-from apps.strategies.views import StrategyTriggerViewSet, StrategyViewSet, TriggerEventViewSet
+from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet
 
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
@@ -21,24 +21,27 @@ router.register("clients", ClientAccountViewSet, basename="client")
 router.register("groups", EconomicGroupViewSet, basename="group")
 router.register("subgroups", SubGroupViewSet, basename="subgroup")
 router.register("crops", CropViewSet, basename="crop")
+router.register("currencies", CurrencyViewSet, basename="currency")
+router.register("units", UnitViewSet, basename="unit")
+router.register("price-units", PriceUnitViewSet, basename="price-unit")
+router.register("exchanges", ExchangeViewSet, basename="exchange")
 router.register("seasons", CropSeasonViewSet, basename="season")
 router.register("counterparties", CounterpartyViewSet, basename="counterparty")
 router.register("brokers", BrokerViewSet, basename="broker")
-router.register("units", UnitOfMeasureViewSet, basename="unit")
 router.register("instruments", MarketInstrumentViewSet, basename="instrument")
 router.register("price-sources", PriceSourceViewSet, basename="price-source")
+router.register("physical-quotes", PhysicalQuoteViewSet, basename="physical-quote")
+router.register("budget-costs", BudgetCostViewSet, basename="budget-cost")
+router.register("actual-costs", ActualCostViewSet, basename="actual-cost")
 router.register("physical-sales", PhysicalSaleViewSet, basename="physical-sale")
 router.register("derivative-operations", DerivativeOperationViewSet, basename="derivative-operation")
-router.register("derivative-legs", DerivativeLegViewSet, basename="derivative-leg")
-router.register("hedge-allocations", HedgeAllocationViewSet, basename="hedge-allocation")
 router.register("strategies", StrategyViewSet, basename="strategy")
 router.register("strategy-triggers", StrategyTriggerViewSet, basename="strategy-trigger")
-router.register("trigger-events", TriggerEventViewSet, basename="trigger-event")
+router.register("hedge-policies", HedgePolicyViewSet, basename="hedge-policy")
+router.register("crop-boards", CropBoardViewSet, basename="crop-board")
 router.register("market-prices", MarketPriceViewSet, basename="market-price")
 router.register("fx-rates", FxRateViewSet, basename="fx-rate")
 router.register("basis-series", BasisSeriesViewSet, basename="basis-series")
-router.register("mtm-snapshots", MarkToMarketSnapshotViewSet, basename="mtm-snapshot")
-router.register("cash-settlements", CashSettlementViewSet, basename="cash-settlement")
 router.register("exposure-positions", ExposurePositionViewSet, basename="exposure-position")
 router.register("audit-logs", AuditLogViewSet, basename="audit-log")
 router.register("attachments", AttachmentViewSet, basename="attachment")

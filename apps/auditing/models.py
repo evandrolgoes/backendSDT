@@ -8,10 +8,12 @@ from apps.core.models import TenantAwareModel, TimeStampedModel
 
 class AuditLog(TenantAwareModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs")
+    formulario = models.CharField(max_length=150, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
     object_id = models.PositiveBigIntegerField()
     content_object = GenericForeignKey("content_type", "object_id")
     action = models.CharField(max_length=50)
+    alteracoes = models.JSONField(default=list, blank=True)
     changes_json = models.JSONField(default=dict, blank=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

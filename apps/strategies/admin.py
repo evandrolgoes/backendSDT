@@ -1,7 +1,8 @@
 from django.contrib import admin
 
-from .models import Strategy, StrategyTrigger, TriggerEvent
+from .models import CropBoard, HedgePolicy, Strategy, StrategyTrigger
 
 admin.site.register(Strategy)
 admin.site.register(StrategyTrigger)
-admin.site.register(TriggerEvent)
+admin.site.register(HedgePolicy)
+admin.site.register(CropBoard)

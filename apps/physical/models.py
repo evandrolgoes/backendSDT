@@ -3,56 +3,86 @@ from django.db import models
 from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
 
 
-class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
-    class Status(models.TextChoices):
-        OPEN = "open", "Open"
-        PARTIAL = "partial", "Partial"
-        CLOSED = "closed", "Closed"
-        CANCELLED = "cancelled", "Cancelled"
-
-    client = models.ForeignKey("clients.ClientAccount", on_delete=models.PROTECT, related_name="physical_sales")
-    group = models.ForeignKey("clients.EconomicGroup", on_delete=models.PROTECT, related_name="physical_sales")
-    subgroup = models.ForeignKey("clients.SubGroup", on_delete=models.PROTECT, related_name="physical_sales")
-    crop = models.ForeignKey("catalog.Crop", on_delete=models.PROTECT, related_name="physical_sales")
-    season = models.ForeignKey("clients.CropSeason", on_delete=models.PROTECT, related_name="physical_sales")
-    counterparty = models.ForeignKey("clients.Counterparty", on_delete=models.PROTECT, related_name="physical_sales")
-    trade_date = models.DateField()
-    delivery_start = models.DateField()
-    delivery_end = models.DateField()
-    quantity = models.DecimalField(max_digits=18, decimal_places=4)
-    unit = models.ForeignKey("catalog.UnitOfMeasure", on_delete=models.PROTECT, related_name="physical_sales")
-    price = models.DecimalField(max_digits=18, decimal_places=4)
-    currency = models.CharField(max_length=10, default="BRL")
-    basis = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    exchange_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
-    gross_value_brl = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
-    gross_value_usd = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
-    notes = models.TextField(blank=True)
-    external_id = models.CharField(max_length=80, blank=True)
+class PhysicalQuote(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    cotacao = models.DecimalField(max_digits=18, decimal_places=4)
+    cultura_texto = models.CharField(max_length=100)
+    data_pgto = models.DateField(null=True, blank=True)
+    data_report = models.DateField(null=True, blank=True)
+    localidade = models.CharField(max_length=120, blank=True)
+    moeda_unidade = models.CharField(max_length=30)
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="cotacoes_fisico")
+    obs = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["-trade_date", "-created_at"]
-        indexes = [models.Index(fields=["tenant", "client", "trade_date"]), models.Index(fields=["tenant", "status"])]
+        ordering = ["-data_report", "-created_at"]
 
     def __str__(self):
-        return f"{self.client} - {self.trade_date}"
+        return f"{self.cultura_texto} - {self.data_report or self.created_at.date()}"
 
 
-class HedgeAllocation(TenantAwareModel):
-    class AllocationType(models.TextChoices):
-        DIRECT = "direct", "Direct"
-        PARTIAL = "partial", "Partial"
-        STRATEGIC = "strategic", "Strategic"
-
-    physical_sale = models.ForeignKey(PhysicalSale, on_delete=models.CASCADE, related_name="allocations")
-    derivative_operation = models.ForeignKey("derivatives.DerivativeOperation", on_delete=models.CASCADE, related_name="allocations")
-    allocated_quantity = models.DecimalField(max_digits=18, decimal_places=4)
-    allocated_unit = models.ForeignKey("catalog.UnitOfMeasure", on_delete=models.PROTECT, related_name="hedge_allocations")
-    allocation_type = models.CharField(max_length=20, choices=AllocationType.choices)
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+class BudgetCost(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_orcamento")
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_orcamento")
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_orcamento")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_orcamento")
+    considerar_na_politica_de_hedge = models.BooleanField(default=False)
+    grupo_despesa = models.CharField(max_length=120)
+    moeda = models.CharField(max_length=20)
+    valor = models.DecimalField(max_digits=18, decimal_places=2)
+    obs = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["-created_at"]
-        indexes = [models.Index(fields=["tenant", "physical_sale"]), models.Index(fields=["tenant", "derivative_operation"])]
+        ordering = ["grupo_despesa", "-created_at"]
+
+    def __str__(self):
+        return f"{self.grupo_despesa} - {self.valor}"
+
+
+class ActualCost(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
+    grupo_despesa = models.CharField(max_length=120)
+    moeda = models.CharField(max_length=20)
+    valor = models.DecimalField(max_digits=18, decimal_places=2)
+    obs = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["grupo_despesa", "-created_at"]
+
+    def __str__(self):
+        return f"{self.grupo_despesa} - {self.valor}"
+
+
+class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
+    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="vendas_fisico")
+    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="vendas_fisico")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
+    basis_valor = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    basis_moeda = models.CharField(max_length=30, blank=True)
+    bolsa_ref = models.CharField(max_length=50, blank=True)
+    cif_fob = models.CharField(max_length=20, blank=True)
+    compra_venda = models.CharField(max_length=20, blank=True)
+    contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
+    contrato_bolsa = models.CharField(max_length=120, blank=True)
+    cotacao_bolsa_ref = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    cultura_produto = models.CharField(max_length=100, blank=True)
+    data_entrega = models.DateField(null=True, blank=True)
+    data_negociacao = models.DateField(null=True, blank=True)
+    data_pagamento = models.DateField(null=True, blank=True)
+    dolar_de_venda = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    faturamento_total_contrato = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    moeda_contrato = models.CharField(max_length=20, blank=True)
+    objetivo_venda_dolarizada = models.CharField(max_length=120, blank=True)
+    pf_paf = models.CharField(max_length=20, blank=True)
+    preco = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    unidade_contrato = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    volume_fisico = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-data_negociacao", "-created_at"]
+
+    def __str__(self):
+        return f"Venda fisico {self.id}"

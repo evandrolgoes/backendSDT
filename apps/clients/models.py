@@ -26,61 +26,49 @@ class ClientAccount(TenantAwareModel, TimeStampedModel):
 
 
 class EconomicGroup(TenantAwareModel):
-    client = models.ForeignKey(ClientAccount, on_delete=models.CASCADE, related_name="groups")
-    code = models.CharField(max_length=30)
-    name = models.CharField(max_length=120)
+    grupo = models.CharField(max_length=120, null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "client", "code"], name="uq_group_code_client")]
-        indexes = [models.Index(fields=["tenant", "client"])]
+        constraints = [models.UniqueConstraint(fields=["tenant", "grupo"], name="uq_group_name_tenant")]
+        indexes = [models.Index(fields=["tenant", "grupo"])]
 
     def __str__(self):
-        return self.name
+        return self.grupo
 
 
 class SubGroup(TenantAwareModel):
-    group = models.ForeignKey(EconomicGroup, on_delete=models.CASCADE, related_name="subgroups")
-    code = models.CharField(max_length=30)
-    name = models.CharField(max_length=120)
+    grupo = models.ForeignKey(EconomicGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="subgrupos")
+    subgrupo = models.CharField(max_length=120, null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "group", "code"], name="uq_subgroup_code_group")]
-        indexes = [models.Index(fields=["tenant", "group"])]
+        constraints = [models.UniqueConstraint(fields=["tenant", "grupo", "subgrupo"], name="uq_subgroup_name_group")]
+        indexes = [models.Index(fields=["tenant", "grupo"])]
 
     def __str__(self):
-        return self.name
+        return self.subgrupo
 
 
 class CropSeason(TenantAwareModel):
-    client = models.ForeignKey(ClientAccount, on_delete=models.CASCADE, related_name="seasons")
-    crop = models.ForeignKey("catalog.Crop", on_delete=models.PROTECT, related_name="seasons")
-    season_label = models.CharField(max_length=40)
-    start_date = models.DateField()
-    end_date = models.DateField()
+    safra = models.CharField(max_length=40, null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "client", "crop", "season_label"], name="uq_crop_season")]
-        indexes = [models.Index(fields=["tenant", "client", "crop"])]
+        constraints = [models.UniqueConstraint(fields=["tenant", "safra"], name="uq_safra_tenant")]
+        indexes = [models.Index(fields=["tenant", "safra"])]
 
     def __str__(self):
-        return self.season_label
+        return self.safra
 
 
 class Counterparty(TenantAwareModel):
-    class CounterpartyType(models.TextChoices):
-        BUYER = "buyer", "Buyer"
-        BROKER = "broker", "Broker"
-        BANK = "bank", "Bank"
-        EXCHANGE = "exchange", "Exchange"
-
-    name = models.CharField(max_length=120)
-    counterparty_type = models.CharField(max_length=20, choices=CounterpartyType.choices)
+    subgrupo = models.ForeignKey(SubGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="contrapartes")
+    grupo = models.ForeignKey(EconomicGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="contrapartes")
+    obs = models.TextField(blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "name"], name="uq_counterparty_name_tenant")]
+        indexes = [models.Index(fields=["tenant", "grupo"]), models.Index(fields=["tenant", "subgrupo"])]
 
     def __str__(self):
-        return self.name
+        return f"{self.grupo} / {self.subgrupo}"
 
 
 class Broker(TenantAwareModel):

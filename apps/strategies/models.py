@@ -4,54 +4,84 @@ from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
 
 
 class Strategy(TenantAwareModel, CreatedByMixin, TimeStampedModel):
-    client = models.ForeignKey("clients.ClientAccount", on_delete=models.PROTECT, related_name="strategies")
-    crop = models.ForeignKey("catalog.Crop", on_delete=models.PROTECT, related_name="strategies")
-    season = models.ForeignKey("clients.CropSeason", on_delete=models.PROTECT, related_name="strategies")
-    name = models.CharField(max_length=120)
-    description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
+    data_validade = models.DateField(null=True, blank=True)
+    descricao_estrategia = models.TextField(blank=True)
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="estrategias")
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="estrategias")
+    obs = models.TextField(blank=True)
+    status = models.CharField(max_length=50, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "client", "season", "name"], name="uq_strategy_name")]
+        ordering = ["-data_validade", "-created_at"]
+
+    def __str__(self):
+        return self.descricao_estrategia[:80] or f"Estrategia {self.id}"
 
 
 class StrategyTrigger(models.Model):
-    class TriggerType(models.TextChoices):
-        PRICE = "price", "Price"
-        FX = "fx", "FX"
-        BASIS = "basis", "Basis"
-        VOLUME = "volume", "Volume"
+    estrategia = models.ForeignKey(Strategy, null=True, blank=True, on_delete=models.SET_NULL, related_name="gatilhos")
+    acima_abaixo = models.CharField(max_length=20, blank=True)
+    contrato_bolsa = models.CharField(max_length=120, blank=True)
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="gatilhos")
+    codigo_derivativo = models.CharField(max_length=120, blank=True)
+    codigos_estrategia = models.JSONField(default=list, blank=True)
+    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="gatilhos")
+    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="gatilhos")
+    posicao = models.CharField(max_length=20, blank=True)
+    produto_bolsa = models.CharField(max_length=120, blank=True)
+    status_gatilho = models.CharField(max_length=50, blank=True)
+    strike_alvo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    tipo_fis_der = models.CharField(max_length=20, blank=True)
+    unidade = models.CharField(max_length=20, blank=True)
+    volume = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    obs = models.TextField(blank=True)
+    status = models.CharField(max_length=50, blank=True)
 
-    class Operator(models.TextChoices):
-        GT = "gt", ">"
-        GTE = "gte", ">="
-        LT = "lt", "<"
-        LTE = "lte", "<="
-        EQ = "eq", "="
+    class Meta:
+        ordering = ["-id"]
 
-    class ActionType(models.TextChoices):
-        ALERT = "alert", "Alert"
-        EXECUTE = "execute", "Execute"
-        REVIEW = "review", "Review"
-
-    strategy = models.ForeignKey(Strategy, on_delete=models.CASCADE, related_name="triggers")
-    name = models.CharField(max_length=120)
-    trigger_type = models.CharField(max_length=20, choices=TriggerType.choices)
-    operator = models.CharField(max_length=10, choices=Operator.choices)
-    target_value = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    target_text = models.CharField(max_length=120, blank=True)
-    action_type = models.CharField(max_length=20, choices=ActionType.choices)
-    priority = models.PositiveIntegerField(default=1)
-    is_active = models.BooleanField(default=True)
+    def __str__(self):
+        return self.contrato_bolsa or f"Gatilho {self.id}"
 
 
-class TriggerEvent(models.Model):
-    class Status(models.TextChoices):
-        FIRED = "fired", "Fired"
-        IGNORED = "ignored", "Ignored"
-        EXECUTED = "executed", "Executed"
+class HedgePolicy(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="politicas_hedge")
+    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="politicas_hedge")
+    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="politicas_hedge")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="politicas_hedge")
+    insumos_travados_maximo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    insumos_travados_minimo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    margem_alvo_minimo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    mes_ano = models.DateField(null=True, blank=True)
+    obs = models.TextField(blank=True)
+    vendas_x_custo_maximo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    vendas_x_custo_minimo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    vendas_x_prod_total_maximo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    vendas_x_prod_total_minimo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
 
-    trigger = models.ForeignKey(StrategyTrigger, on_delete=models.CASCADE, related_name="events")
-    occurred_at = models.DateTimeField()
-    reference_value = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices)
+    class Meta:
+        ordering = ["-mes_ano", "-created_at"]
+
+    def __str__(self):
+        return f"Politica {self.id}"
+
+
+class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
+    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="quadros_safra")
+    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="quadros_safra")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
+    area = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    bolsa_ref = models.CharField(max_length=50, blank=True)
+    monitorar_vc = models.BooleanField(default=False)
+    obs = models.TextField(blank=True)
+    produtividade = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    producao_total = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    criar_politica_hedge = models.BooleanField(default=False)
+    unidade_producao = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Quadro safra {self.id}"

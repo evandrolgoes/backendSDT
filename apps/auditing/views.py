@@ -7,8 +7,8 @@ from .serializers import AttachmentSerializer, AuditLogSerializer
 class AuditLogViewSet(TenantScopedModelViewSet):
     queryset = AuditLog.objects.select_related("tenant", "user", "content_type").all()
     serializer_class = AuditLogSerializer
-    filterset_fields = ["tenant", "user", "action", "content_type"]
-    search_fields = ["description"]
+    filterset_fields = ["tenant", "user", "action", "content_type", "formulario"]
+    search_fields = ["description", "formulario"]
 
 
 class AttachmentViewSet(TenantScopedModelViewSet):

@@ -28,3 +28,4 @@ class CreatedByMixin(models.Model):
 
     class Meta:
         abstract = True
+

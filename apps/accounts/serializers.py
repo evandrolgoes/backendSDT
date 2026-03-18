@@ -33,6 +33,13 @@ class UserSerializer(serializers.ModelSerializer):
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     tenant_slug = serializers.CharField(source="tenant.slug", read_only=True)
 
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        if request and getattr(request.user, "is_authenticated", False) and "tenant" in fields and not request.user.is_superuser:
+            fields["tenant"] = serializers.HiddenField(default=request.user.tenant)
+        return fields
+
     class Meta:
         model = User
         fields = [
@@ -55,13 +62,15 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_tenant(self, value):
         request = self.context["request"]
+        if not getattr(request.user, "is_authenticated", False):
+            return value
         if request.user.is_superuser:
             return value
         return request.user.tenant
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)
-        if not self.context["request"].user.is_superuser:
+        if getattr(self.context["request"].user, "is_authenticated", False) and not self.context["request"].user.is_superuser:
             validated_data["tenant"] = self.context["request"].user.tenant
         user = User(**validated_data)
         if password:
@@ -86,7 +95,15 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        user = authenticate(username=attrs["username"], password=attrs["password"])
+        username_or_email = attrs["username"].strip()
+        password = attrs["password"]
+
+        user = authenticate(username=username_or_email, password=password)
+        if not user and "@" in username_or_email:
+            matched_user = User.objects.filter(email__iexact=username_or_email).first()
+            if matched_user:
+                user = authenticate(username=matched_user.username, password=password)
+
         if not user or not user.is_active:
             raise serializers.ValidationError("Credenciais inválidas.")
         refresh = RefreshToken.for_user(user)

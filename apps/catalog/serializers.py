@@ -1,17 +1,11 @@
 from rest_framework import serializers
 
-from .models import Crop, MarketInstrument, PriceSource, UnitOfMeasure
+from .models import Crop, Currency, Exchange, MarketInstrument, PriceSource, PriceUnit, Unit
 
 
 class CropSerializer(serializers.ModelSerializer):
     class Meta:
         model = Crop
-        fields = "__all__"
-
-
-class UnitOfMeasureSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UnitOfMeasure
         fields = "__all__"
 
 
@@ -24,4 +18,28 @@ class MarketInstrumentSerializer(serializers.ModelSerializer):
 class PriceSourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = PriceSource
+        fields = "__all__"
+
+
+class CurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = "__all__"
+
+
+class UnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Unit
+        fields = "__all__"
+
+
+class PriceUnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PriceUnit
+        fields = "__all__"
+
+
+class ExchangeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Exchange
         fields = "__all__"

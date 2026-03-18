@@ -4,10 +4,17 @@ from .models import Attachment, AuditLog
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
+    usuario = serializers.SerializerMethodField()
+
+    def get_usuario(self, obj):
+        if not obj.user:
+            return ""
+        return obj.user.full_name or obj.user.username
+
     class Meta:
         model = AuditLog
         fields = "__all__"
-        read_only_fields = ["created_at"]
+        read_only_fields = ["created_at", "usuario"]
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
