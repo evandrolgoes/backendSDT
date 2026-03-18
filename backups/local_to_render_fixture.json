@@ -1,0 +1,2554 @@
+[
+{
+  "model": "accounts.tenant",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-17T17:09:55.436Z",
+    "updated_at": "2026-03-17T17:09:55.436Z",
+    "name": "SDT",
+    "slug": "SDT",
+    "is_active": true
+  }
+},
+{
+  "model": "accounts.user",
+  "pk": 1,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$6ayEQvXq67DZAjoKGgIGTp$+8b2tNxaZziwBn8CVzW/RaulBBAqgBF1ZMCgaSUbIeo=",
+    "last_login": "2026-03-17T17:04:03Z",
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-17T16:55:06Z",
+    "tenant": 1,
+    "email": "admin@local.test",
+    "full_name": "Administrador",
+    "phone": "",
+    "access_status": "active",
+    "created_at": "2026-03-17T16:55:06.614Z",
+    "groups": [],
+    "user_permissions": [],
+    "assigned_groups": [],
+    "assigned_subgroups": []
+  }
+},
+{
+  "model": "clients.economicgroup",
+  "pk": 1,
+  "fields": {
+    "tenant": 1,
+    "grupo": "Frankanna"
+  }
+},
+{
+  "model": "clients.economicgroup",
+  "pk": 2,
+  "fields": {
+    "tenant": 1,
+    "grupo": "Rickli"
+  }
+},
+{
+  "model": "clients.subgroup",
+  "pk": 1,
+  "fields": {
+    "tenant": 1,
+    "subgrupo": "OR_PR"
+  }
+},
+{
+  "model": "clients.subgroup",
+  "pk": 2,
+  "fields": {
+    "tenant": 1,
+    "subgrupo": "Frank_PR"
+  }
+},
+{
+  "model": "clients.cropseason",
+  "pk": 1,
+  "fields": {
+    "tenant": 1,
+    "safra": "22/23"
+  }
+},
+{
+  "model": "clients.cropseason",
+  "pk": 2,
+  "fields": {
+    "tenant": 1,
+    "safra": "23/24"
+  }
+},
+{
+  "model": "clients.cropseason",
+  "pk": 3,
+  "fields": {
+    "tenant": 1,
+    "safra": "24/25"
+  }
+},
+{
+  "model": "clients.cropseason",
+  "pk": 4,
+  "fields": {
+    "tenant": 1,
+    "safra": "25/26"
+  }
+},
+{
+  "model": "clients.cropseason",
+  "pk": 5,
+  "fields": {
+    "tenant": 1,
+    "safra": "26/27"
+  }
+},
+{
+  "model": "clients.cropseason",
+  "pk": 6,
+  "fields": {
+    "tenant": 1,
+    "safra": "27/28"
+  }
+},
+{
+  "model": "clients.counterparty",
+  "pk": 1,
+  "fields": {
+    "tenant": 1,
+    "subgrupo": 2,
+    "grupo": 1,
+    "obs": "Coop. Frisia"
+  }
+},
+{
+  "model": "clients.counterparty",
+  "pk": 2,
+  "fields": {
+    "tenant": 1,
+    "subgrupo": 1,
+    "grupo": 2,
+    "obs": "CAMP"
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 1,
+  "fields": {
+    "cultura": "Soja",
+    "bolsa_ref": [
+      "soja_cbot"
+    ],
+    "imagem": "",
+    "unidade_fisico": [
+      1
+    ]
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 2,
+  "fields": {
+    "cultura": "Milho",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 3,
+  "fields": {
+    "cultura": "Trigo",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 4,
+  "fields": {
+    "cultura": "Cevada",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 5,
+  "fields": {
+    "cultura": "Feijão",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 6,
+  "fields": {
+    "cultura": "Algodão",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 7,
+  "fields": {
+    "cultura": "Gergelim",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 8,
+  "fields": {
+    "cultura": "Arroz",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 9,
+  "fields": {
+    "cultura": "Café",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.crop",
+  "pk": 10,
+  "fields": {
+    "cultura": "Boi",
+    "bolsa_ref": [],
+    "imagem": "",
+    "unidade_fisico": []
+  }
+},
+{
+  "model": "catalog.currency",
+  "pk": 1,
+  "fields": {
+    "nome": "U$"
+  }
+},
+{
+  "model": "catalog.currency",
+  "pk": 2,
+  "fields": {
+    "nome": "R$"
+  }
+},
+{
+  "model": "catalog.currency",
+  "pk": 3,
+  "fields": {
+    "nome": "E$"
+  }
+},
+{
+  "model": "catalog.currency",
+  "pk": 4,
+  "fields": {
+    "nome": "sc"
+  }
+},
+{
+  "model": "catalog.unit",
+  "pk": 1,
+  "fields": {
+    "nome": "sc"
+  }
+},
+{
+  "model": "catalog.unit",
+  "pk": 2,
+  "fields": {
+    "nome": "@"
+  }
+},
+{
+  "model": "catalog.unit",
+  "pk": 3,
+  "fields": {
+    "nome": "bus"
+  }
+},
+{
+  "model": "catalog.priceunit",
+  "pk": 1,
+  "fields": {
+    "nome": "R$/sc"
+  }
+},
+{
+  "model": "catalog.priceunit",
+  "pk": 2,
+  "fields": {
+    "nome": "U$/bus"
+  }
+},
+{
+  "model": "catalog.priceunit",
+  "pk": 3,
+  "fields": {
+    "nome": "U$/sc"
+  }
+},
+{
+  "model": "catalog.priceunit",
+  "pk": 4,
+  "fields": {
+    "nome": "R$/@"
+  }
+},
+{
+  "model": "catalog.exchange",
+  "pk": 1,
+  "fields": {
+    "nome": "soja_cbot",
+    "cultura": "Soja",
+    "moeda_bolsa": "U$",
+    "volume_padrao_contrato": "5000.0000",
+    "unidade_bolsa": "bus",
+    "moeda_cmdtye": "Cmdtye",
+    "moeda_unidade_padrao": "U$/bus",
+    "fator_conversao_unidade_padrao_cultura": "2.2046"
+  }
+},
+{
+  "model": "catalog.exchange",
+  "pk": 2,
+  "fields": {
+    "nome": "milho_cbot",
+    "cultura": "Milho",
+    "moeda_bolsa": "U$",
+    "volume_padrao_contrato": "5000.0000",
+    "unidade_bolsa": "bus",
+    "moeda_cmdtye": "Cmdtye",
+    "moeda_unidade_padrao": "U$/bus",
+    "fator_conversao_unidade_padrao_cultura": "2.2046"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 1,
+  "fields": {
+    "nome": "Compra Call seca"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 2,
+  "fields": {
+    "nome": "Compra Put seca"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 3,
+  "fields": {
+    "nome": "Compra NDF"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 4,
+  "fields": {
+    "nome": "Venda Call seca"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 5,
+  "fields": {
+    "nome": "Venda Put seca"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 6,
+  "fields": {
+    "nome": "Venda NDF"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 7,
+  "fields": {
+    "nome": "1by2"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 8,
+  "fields": {
+    "nome": "Collar venda"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 9,
+  "fields": {
+    "nome": "Seagull venda"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 10,
+  "fields": {
+    "nome": "Call spread"
+  }
+},
+{
+  "model": "catalog.derivativeoperationname",
+  "pk": 11,
+  "fields": {
+    "nome": "Put Spread"
+  }
+},
+{
+  "model": "physical.physicalquote",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-17T17:18:36.008Z",
+    "updated_at": "2026-03-17T17:18:36.008Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cotacao": "130.0000",
+    "cultura_texto": "Soja",
+    "data_pgto": "2026-05-30",
+    "data_report": "2026-03-17",
+    "localidade": "PR/Ponta Grossa",
+    "moeda_unidade": "R$/sc",
+    "safra": 4,
+    "obs": ""
+  }
+},
+{
+  "model": "physical.physicalquote",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-17T17:18:49.613Z",
+    "updated_at": "2026-03-17T17:18:49.613Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cotacao": "24.0000",
+    "cultura_texto": "Soja",
+    "data_pgto": "2026-05-30",
+    "data_report": "2026-03-17",
+    "localidade": "PR/Ponta Grossa",
+    "moeda_unidade": "U$/sc",
+    "safra": 4,
+    "obs": ""
+  }
+},
+{
+  "model": "physical.budgetcost",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-17T17:19:36.257Z",
+    "updated_at": "2026-03-17T17:19:36.257Z",
+    "tenant": 1,
+    "created_by": 1,
+    "subgrupo": 2,
+    "grupo": 1,
+    "cultura": 1,
+    "safra": 4,
+    "considerar_na_politica_de_hedge": true,
+    "grupo_despesa": "Insumos KCL",
+    "moeda": "R$",
+    "valor": "30000000.00",
+    "obs": ""
+  }
+},
+{
+  "model": "physical.physicalsale",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-17T17:15:11.755Z",
+    "updated_at": "2026-03-17T17:15:11.755Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cultura": 1,
+    "safra": 4,
+    "basis_valor": "1.0000",
+    "basis_moeda": "U$/bus",
+    "bolsa_ref": "soja_cbot",
+    "cif_fob": "CIF",
+    "compra_venda": "Venda",
+    "contraparte": null,
+    "cotacao_bolsa_ref": "1.0000",
+    "cultura_produto": "Soja",
+    "data_entrega": "2026-05-10",
+    "data_negociacao": "2026-03-11",
+    "data_pagamento": "2026-06-25",
+    "dolar_de_venda": "5.500000",
+    "faturamento_total_contrato": "260000.00",
+    "moeda_contrato": "R$",
+    "objetivo_venda_dolarizada": "",
+    "pf_paf": "PF",
+    "preco": "130.0000",
+    "unidade_contrato": "sc",
+    "volume_fisico": "2000.0000",
+    "grupos": [
+      1
+    ],
+    "subgrupos": [
+      2
+    ]
+  }
+},
+{
+  "model": "physical.physicalsale",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-17T17:17:45.178Z",
+    "updated_at": "2026-03-17T17:17:45.178Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cultura": 1,
+    "safra": 4,
+    "basis_valor": "1.0000",
+    "basis_moeda": "U$/bus",
+    "bolsa_ref": "soja_cbot",
+    "cif_fob": "CIF",
+    "compra_venda": "Venda",
+    "contraparte": null,
+    "cotacao_bolsa_ref": "1.0000",
+    "cultura_produto": "Soja",
+    "data_entrega": "2026-05-10",
+    "data_negociacao": "2026-04-24",
+    "data_pagamento": "2026-08-20",
+    "dolar_de_venda": "5.500000",
+    "faturamento_total_contrato": "6750000.00",
+    "moeda_contrato": "R$",
+    "objetivo_venda_dolarizada": "",
+    "pf_paf": "PF",
+    "preco": "135.0000",
+    "unidade_contrato": "sc",
+    "volume_fisico": "50000.0000",
+    "grupos": [
+      1
+    ],
+    "subgrupos": [
+      2
+    ]
+  }
+},
+{
+  "model": "physical.physicalsale",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-17T17:20:54.105Z",
+    "updated_at": "2026-03-17T17:26:23.131Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cultura": 1,
+    "safra": 4,
+    "basis_valor": "1.0000",
+    "basis_moeda": "U$/bus",
+    "bolsa_ref": "soja_cbot",
+    "cif_fob": "CIF",
+    "compra_venda": "Venda",
+    "contraparte": 1,
+    "cotacao_bolsa_ref": "1.0000",
+    "cultura_produto": "Soja",
+    "data_entrega": "2026-05-10",
+    "data_negociacao": "2026-04-24",
+    "data_pagamento": "2026-08-20",
+    "dolar_de_venda": "5.500000",
+    "faturamento_total_contrato": "1080000.00",
+    "moeda_contrato": "U$",
+    "objetivo_venda_dolarizada": "Venda de componentes",
+    "pf_paf": "PF",
+    "preco": "24.0000",
+    "unidade_contrato": "sc",
+    "volume_fisico": "45000.0000",
+    "grupos": [
+      1
+    ],
+    "subgrupos": [
+      2
+    ]
+  }
+},
+{
+  "model": "strategies.hedgepolicy",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-17T17:16:31.928Z",
+    "updated_at": "2026-03-17T17:20:18.490Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cultura": 1,
+    "safra": 4,
+    "insumos_travados_maximo": "10.0000",
+    "insumos_travados_minimo": "20.0000",
+    "margem_alvo_minimo": "30.0000",
+    "mes_ano": "2026-05-30",
+    "obs": "",
+    "vendas_x_custo_maximo": "30.0000",
+    "vendas_x_custo_minimo": "50.0000",
+    "vendas_x_prod_total_maximo": "50.0000",
+    "vendas_x_prod_total_minimo": "60.0000",
+    "grupos": [
+      1
+    ],
+    "subgrupos": [
+      2
+    ]
+  }
+},
+{
+  "model": "strategies.hedgepolicy",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-17T17:19:58.348Z",
+    "updated_at": "2026-03-17T17:19:58.348Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cultura": 1,
+    "safra": 4,
+    "insumos_travados_maximo": "10.0000",
+    "insumos_travados_minimo": "20.0000",
+    "margem_alvo_minimo": "30.0000",
+    "mes_ano": "2026-03-30",
+    "obs": "",
+    "vendas_x_custo_maximo": "0.0000",
+    "vendas_x_custo_minimo": "30.0000",
+    "vendas_x_prod_total_maximo": "30.0000",
+    "vendas_x_prod_total_minimo": "50.0000",
+    "grupos": [
+      1
+    ],
+    "subgrupos": [
+      2
+    ]
+  }
+},
+{
+  "model": "strategies.cropboard",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-17T17:15:53.061Z",
+    "updated_at": "2026-03-17T17:15:53.061Z",
+    "tenant": 1,
+    "created_by": 1,
+    "cultura": 1,
+    "safra": 4,
+    "localidade": [
+      "PR/Ponta Grossa"
+    ],
+    "area": "10000.0000",
+    "bolsa_ref": "soja_cbot",
+    "monitorar_vc": true,
+    "obs": "",
+    "produtividade": "70.0000",
+    "producao_total": "700000.0000",
+    "criar_politica_hedge": true,
+    "unidade_producao": "sc",
+    "grupos": [
+      1
+    ],
+    "subgrupos": [
+      2
+    ]
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 1,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Economic Group",
+    "content_type": 17,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "grupo",
+        "de": null,
+        "para": "asd"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "grupo": "asd"
+      }
+    },
+    "description": "Economic Group: criado com os valores grupo: asd, id: 1, tenant: SDT.",
+    "created_at": "2026-03-17T17:10:10.345Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 2,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Economic Group",
+    "content_type": 17,
+    "object_id": 1,
+    "action": "alterado",
+    "alteracoes": [
+      {
+        "campo": "grupo",
+        "de": "asd",
+        "para": "Frankanna"
+      }
+    ],
+    "changes_json": {
+      "before": {
+        "id": "1",
+        "tenant": "SDT",
+        "grupo": "asd"
+      },
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "grupo": "Frankanna"
+      }
+    },
+    "description": "Economic Group: grupo: alterado de asd para Frankanna.",
+    "created_at": "2026-03-17T17:10:20.281Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 3,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Economic Group",
+    "content_type": 17,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "grupo",
+        "de": null,
+        "para": "Rickli"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "grupo": "Rickli"
+      }
+    },
+    "description": "Economic Group: criado com os valores grupo: Rickli, id: 2, tenant: SDT.",
+    "created_at": "2026-03-17T17:10:24.139Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 4,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Sub Group",
+    "content_type": 18,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "subgrupo",
+        "de": null,
+        "para": "OR_PR"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "subgrupo": "OR_PR"
+      }
+    },
+    "description": "Sub Group: criado com os valores id: 1, subgrupo: OR_PR, tenant: SDT.",
+    "created_at": "2026-03-17T17:10:29.909Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 5,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Sub Group",
+    "content_type": 18,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "subgrupo",
+        "de": null,
+        "para": "Frank_PR"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "subgrupo": "Frank_PR"
+      }
+    },
+    "description": "Sub Group: criado com os valores id: 2, subgrupo: Frank_PR, tenant: SDT.",
+    "created_at": "2026-03-17T17:10:35.609Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 6,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Season",
+    "content_type": 16,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "22/23"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "safra": "22/23"
+      }
+    },
+    "description": "Crop Season: criado com os valores id: 1, safra: 22/23, tenant: SDT.",
+    "created_at": "2026-03-17T17:13:08.882Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 7,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Season",
+    "content_type": 16,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "23/24"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "safra": "23/24"
+      }
+    },
+    "description": "Crop Season: criado com os valores id: 2, safra: 23/24, tenant: SDT.",
+    "created_at": "2026-03-17T17:13:12.750Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 8,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Season",
+    "content_type": 16,
+    "object_id": 3,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "3"
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "24/25"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "3",
+        "tenant": "SDT",
+        "safra": "24/25"
+      }
+    },
+    "description": "Crop Season: criado com os valores id: 3, safra: 24/25, tenant: SDT.",
+    "created_at": "2026-03-17T17:13:16.444Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 9,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Season",
+    "content_type": 16,
+    "object_id": 4,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "4"
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "4",
+        "tenant": "SDT",
+        "safra": "25/26"
+      }
+    },
+    "description": "Crop Season: criado com os valores id: 4, safra: 25/26, tenant: SDT.",
+    "created_at": "2026-03-17T17:13:19.890Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 10,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Season",
+    "content_type": 16,
+    "object_id": 5,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "5"
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "26/27"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "5",
+        "tenant": "SDT",
+        "safra": "26/27"
+      }
+    },
+    "description": "Crop Season: criado com os valores id: 5, safra: 26/27, tenant: SDT.",
+    "created_at": "2026-03-17T17:13:24.585Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 11,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Season",
+    "content_type": 16,
+    "object_id": 6,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "id",
+        "de": null,
+        "para": "6"
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "27/28"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "6",
+        "tenant": "SDT",
+        "safra": "27/28"
+      }
+    },
+    "description": "Crop Season: criado com os valores id: 6, safra: 27/28, tenant: SDT.",
+    "created_at": "2026-03-17T17:13:28.613Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 12,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Physical Sale",
+    "content_type": 28,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "basis_moeda",
+        "de": null,
+        "para": "U$/bus"
+      },
+      {
+        "campo": "basis_valor",
+        "de": null,
+        "para": 1.0
+      },
+      {
+        "campo": "bolsa_ref",
+        "de": null,
+        "para": "soja_cbot"
+      },
+      {
+        "campo": "cif_fob",
+        "de": null,
+        "para": "CIF"
+      },
+      {
+        "campo": "compra_venda",
+        "de": null,
+        "para": "Venda"
+      },
+      {
+        "campo": "cotacao_bolsa_ref",
+        "de": null,
+        "para": 1.0
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "cultura_produto",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "data_entrega",
+        "de": null,
+        "para": "2026-05-10"
+      },
+      {
+        "campo": "data_negociacao",
+        "de": null,
+        "para": "2026-03-11"
+      },
+      {
+        "campo": "data_pagamento",
+        "de": null,
+        "para": "2026-06-25"
+      },
+      {
+        "campo": "dolar_de_venda",
+        "de": null,
+        "para": 5.5
+      },
+      {
+        "campo": "faturamento_total_contrato",
+        "de": null,
+        "para": 260000.0
+      },
+      {
+        "campo": "grupos",
+        "de": null,
+        "para": [
+          1
+        ]
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "moeda_contrato",
+        "de": null,
+        "para": "R$"
+      },
+      {
+        "campo": "objetivo_venda_dolarizada",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "pf_paf",
+        "de": null,
+        "para": "PF"
+      },
+      {
+        "campo": "preco",
+        "de": null,
+        "para": 130.0
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupos",
+        "de": null,
+        "para": [
+          2
+        ]
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "unidade_contrato",
+        "de": null,
+        "para": "sc"
+      },
+      {
+        "campo": "volume_fisico",
+        "de": null,
+        "para": 2000.0
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "basis_valor": 1.0,
+        "basis_moeda": "U$/bus",
+        "bolsa_ref": "soja_cbot",
+        "cif_fob": "CIF",
+        "compra_venda": "Venda",
+        "contraparte": null,
+        "cotacao_bolsa_ref": 1.0,
+        "cultura_produto": "Soja",
+        "data_entrega": "2026-05-10",
+        "data_negociacao": "2026-03-11",
+        "data_pagamento": "2026-06-25",
+        "dolar_de_venda": 5.5,
+        "faturamento_total_contrato": 260000.0,
+        "moeda_contrato": "R$",
+        "objetivo_venda_dolarizada": "",
+        "pf_paf": "PF",
+        "preco": 130.0,
+        "unidade_contrato": "sc",
+        "volume_fisico": 2000.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Physical Sale: criado com os valores basis_moeda: U$/bus, basis_valor: 1.0, bolsa_ref: soja_cbot, cif_fob: CIF, compra_venda: Venda, cotacao_bolsa_ref: 1.0, created_by: admin, cultura: Soja, cultura_produto: Soja, data_entrega: 2026-05-10, data_negociacao: 2026-03-11, data_pagamento: 2026-06-25, dolar_de_venda: 5.5, faturamento_total_contrato: 260000.0, grupos: [1], id: 1, moeda_contrato: R$, objetivo_venda_dolarizada: , pf_paf: PF, preco: 130.0, safra: 25/26, subgrupos: [2], tenant: SDT, unidade_contrato: sc, volume_fisico: 2000.0.",
+    "created_at": "2026-03-17T17:15:11.763Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 13,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Crop Board",
+    "content_type": 37,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "area",
+        "de": null,
+        "para": 10000.0
+      },
+      {
+        "campo": "bolsa_ref",
+        "de": null,
+        "para": "soja_cbot"
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "criar_politica_hedge",
+        "de": null,
+        "para": true
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "grupos",
+        "de": null,
+        "para": [
+          1
+        ]
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "localidade",
+        "de": null,
+        "para": "['PR/Ponta Grossa']"
+      },
+      {
+        "campo": "monitorar_vc",
+        "de": null,
+        "para": true
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "producao_total",
+        "de": null,
+        "para": 700000.0
+      },
+      {
+        "campo": "produtividade",
+        "de": null,
+        "para": 70.0
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupos",
+        "de": null,
+        "para": [
+          2
+        ]
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "unidade_producao",
+        "de": null,
+        "para": "sc"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "localidade": "['PR/Ponta Grossa']",
+        "area": 10000.0,
+        "bolsa_ref": "soja_cbot",
+        "monitorar_vc": true,
+        "obs": "",
+        "produtividade": 70.0,
+        "producao_total": 700000.0,
+        "criar_politica_hedge": true,
+        "unidade_producao": "sc",
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Crop Board: criado com os valores area: 10000.0, bolsa_ref: soja_cbot, created_by: admin, criar_politica_hedge: True, cultura: Soja, grupos: [1], id: 1, localidade: ['PR/Ponta Grossa'], monitorar_vc: True, obs: , producao_total: 700000.0, produtividade: 70.0, safra: 25/26, subgrupos: [2], tenant: SDT, unidade_producao: sc.",
+    "created_at": "2026-03-17T17:15:53.066Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 14,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Hedge Policy",
+    "content_type": 38,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "grupos",
+        "de": null,
+        "para": [
+          1
+        ]
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "insumos_travados_maximo",
+        "de": null,
+        "para": 10.0
+      },
+      {
+        "campo": "insumos_travados_minimo",
+        "de": null,
+        "para": 20.0
+      },
+      {
+        "campo": "margem_alvo_minimo",
+        "de": null,
+        "para": 30.0
+      },
+      {
+        "campo": "mes_ano",
+        "de": null,
+        "para": "2026-03-30"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupos",
+        "de": null,
+        "para": [
+          2
+        ]
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "vendas_x_custo_maximo",
+        "de": null,
+        "para": 0.0
+      },
+      {
+        "campo": "vendas_x_custo_minimo",
+        "de": null,
+        "para": 30.0
+      },
+      {
+        "campo": "vendas_x_prod_total_maximo",
+        "de": null,
+        "para": 30.0
+      },
+      {
+        "campo": "vendas_x_prod_total_minimo",
+        "de": null,
+        "para": 50.0
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "insumos_travados_maximo": 10.0,
+        "insumos_travados_minimo": 20.0,
+        "margem_alvo_minimo": 30.0,
+        "mes_ano": "2026-03-30",
+        "obs": "",
+        "vendas_x_custo_maximo": 0.0,
+        "vendas_x_custo_minimo": 30.0,
+        "vendas_x_prod_total_maximo": 30.0,
+        "vendas_x_prod_total_minimo": 50.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Hedge Policy: criado com os valores created_by: admin, cultura: Soja, grupos: [1], id: 1, insumos_travados_maximo: 10.0, insumos_travados_minimo: 20.0, margem_alvo_minimo: 30.0, mes_ano: 2026-03-30, obs: , safra: 25/26, subgrupos: [2], tenant: SDT, vendas_x_custo_maximo: 0.0, vendas_x_custo_minimo: 30.0, vendas_x_prod_total_maximo: 30.0, vendas_x_prod_total_minimo: 50.0.",
+    "created_at": "2026-03-17T17:16:31.937Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 15,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Physical Sale",
+    "content_type": 28,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "basis_moeda",
+        "de": null,
+        "para": "U$/bus"
+      },
+      {
+        "campo": "basis_valor",
+        "de": null,
+        "para": 1.0
+      },
+      {
+        "campo": "bolsa_ref",
+        "de": null,
+        "para": "soja_cbot"
+      },
+      {
+        "campo": "cif_fob",
+        "de": null,
+        "para": "CIF"
+      },
+      {
+        "campo": "compra_venda",
+        "de": null,
+        "para": "Venda"
+      },
+      {
+        "campo": "cotacao_bolsa_ref",
+        "de": null,
+        "para": 1.0
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "cultura_produto",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "data_entrega",
+        "de": null,
+        "para": "2026-05-10"
+      },
+      {
+        "campo": "data_negociacao",
+        "de": null,
+        "para": "2026-04-24"
+      },
+      {
+        "campo": "data_pagamento",
+        "de": null,
+        "para": "2026-08-20"
+      },
+      {
+        "campo": "dolar_de_venda",
+        "de": null,
+        "para": 5.5
+      },
+      {
+        "campo": "faturamento_total_contrato",
+        "de": null,
+        "para": 6750000.0
+      },
+      {
+        "campo": "grupos",
+        "de": null,
+        "para": [
+          1
+        ]
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "moeda_contrato",
+        "de": null,
+        "para": "R$"
+      },
+      {
+        "campo": "objetivo_venda_dolarizada",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "pf_paf",
+        "de": null,
+        "para": "PF"
+      },
+      {
+        "campo": "preco",
+        "de": null,
+        "para": 135.0
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupos",
+        "de": null,
+        "para": [
+          2
+        ]
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "unidade_contrato",
+        "de": null,
+        "para": "sc"
+      },
+      {
+        "campo": "volume_fisico",
+        "de": null,
+        "para": 50000.0
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "basis_valor": 1.0,
+        "basis_moeda": "U$/bus",
+        "bolsa_ref": "soja_cbot",
+        "cif_fob": "CIF",
+        "compra_venda": "Venda",
+        "contraparte": null,
+        "cotacao_bolsa_ref": 1.0,
+        "cultura_produto": "Soja",
+        "data_entrega": "2026-05-10",
+        "data_negociacao": "2026-04-24",
+        "data_pagamento": "2026-08-20",
+        "dolar_de_venda": 5.5,
+        "faturamento_total_contrato": 6750000.0,
+        "moeda_contrato": "R$",
+        "objetivo_venda_dolarizada": "",
+        "pf_paf": "PF",
+        "preco": 135.0,
+        "unidade_contrato": "sc",
+        "volume_fisico": 50000.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Physical Sale: criado com os valores basis_moeda: U$/bus, basis_valor: 1.0, bolsa_ref: soja_cbot, cif_fob: CIF, compra_venda: Venda, cotacao_bolsa_ref: 1.0, created_by: admin, cultura: Soja, cultura_produto: Soja, data_entrega: 2026-05-10, data_negociacao: 2026-04-24, data_pagamento: 2026-08-20, dolar_de_venda: 5.5, faturamento_total_contrato: 6750000.0, grupos: [1], id: 2, moeda_contrato: R$, objetivo_venda_dolarizada: , pf_paf: PF, preco: 135.0, safra: 25/26, subgrupos: [2], tenant: SDT, unidade_contrato: sc, volume_fisico: 50000.0.",
+    "created_at": "2026-03-17T17:17:45.184Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 16,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Physical Quote",
+    "content_type": 31,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "cotacao",
+        "de": null,
+        "para": 130.0
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura_texto",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "data_pgto",
+        "de": null,
+        "para": "2026-05-30"
+      },
+      {
+        "campo": "data_report",
+        "de": null,
+        "para": "2026-03-17"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "localidade",
+        "de": null,
+        "para": "PR/Ponta Grossa"
+      },
+      {
+        "campo": "moeda_unidade",
+        "de": null,
+        "para": "R$/sc"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cotacao": 130.0,
+        "cultura_texto": "Soja",
+        "data_pgto": "2026-05-30",
+        "data_report": "2026-03-17",
+        "localidade": "PR/Ponta Grossa",
+        "moeda_unidade": "R$/sc",
+        "safra": "25/26",
+        "obs": ""
+      }
+    },
+    "description": "Physical Quote: criado com os valores cotacao: 130.0, created_by: admin, cultura_texto: Soja, data_pgto: 2026-05-30, data_report: 2026-03-17, id: 1, localidade: PR/Ponta Grossa, moeda_unidade: R$/sc, obs: , safra: 25/26, tenant: SDT.",
+    "created_at": "2026-03-17T17:18:36.012Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 17,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Physical Quote",
+    "content_type": 31,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "cotacao",
+        "de": null,
+        "para": 24.0
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura_texto",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "data_pgto",
+        "de": null,
+        "para": "2026-05-30"
+      },
+      {
+        "campo": "data_report",
+        "de": null,
+        "para": "2026-03-17"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "localidade",
+        "de": null,
+        "para": "PR/Ponta Grossa"
+      },
+      {
+        "campo": "moeda_unidade",
+        "de": null,
+        "para": "U$/sc"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cotacao": 24.0,
+        "cultura_texto": "Soja",
+        "data_pgto": "2026-05-30",
+        "data_report": "2026-03-17",
+        "localidade": "PR/Ponta Grossa",
+        "moeda_unidade": "U$/sc",
+        "safra": "25/26",
+        "obs": ""
+      }
+    },
+    "description": "Physical Quote: criado com os valores cotacao: 24.0, created_by: admin, cultura_texto: Soja, data_pgto: 2026-05-30, data_report: 2026-03-17, id: 2, localidade: PR/Ponta Grossa, moeda_unidade: U$/sc, obs: , safra: 25/26, tenant: SDT.",
+    "created_at": "2026-03-17T17:18:49.615Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 18,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Budget Cost",
+    "content_type": 30,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "considerar_na_politica_de_hedge",
+        "de": null,
+        "para": true
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "grupo",
+        "de": null,
+        "para": "Frankanna"
+      },
+      {
+        "campo": "grupo_despesa",
+        "de": null,
+        "para": "Insumos KCL"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "moeda",
+        "de": null,
+        "para": "R$"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupo",
+        "de": null,
+        "para": "Frank_PR"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "valor",
+        "de": null,
+        "para": 30000000.0
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "subgrupo": "Frank_PR",
+        "grupo": "Frankanna",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "considerar_na_politica_de_hedge": true,
+        "grupo_despesa": "Insumos KCL",
+        "moeda": "R$",
+        "valor": 30000000.0,
+        "obs": ""
+      }
+    },
+    "description": "Budget Cost: criado com os valores considerar_na_politica_de_hedge: True, created_by: admin, cultura: Soja, grupo: Frankanna, grupo_despesa: Insumos KCL, id: 1, moeda: R$, obs: , safra: 25/26, subgrupo: Frank_PR, tenant: SDT, valor: 30000000.0.",
+    "created_at": "2026-03-17T17:19:36.260Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 19,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Hedge Policy",
+    "content_type": 38,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "grupos",
+        "de": null,
+        "para": [
+          1
+        ]
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "insumos_travados_maximo",
+        "de": null,
+        "para": 10.0
+      },
+      {
+        "campo": "insumos_travados_minimo",
+        "de": null,
+        "para": 20.0
+      },
+      {
+        "campo": "margem_alvo_minimo",
+        "de": null,
+        "para": 30.0
+      },
+      {
+        "campo": "mes_ano",
+        "de": null,
+        "para": "2026-03-30"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": ""
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupos",
+        "de": null,
+        "para": [
+          2
+        ]
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "vendas_x_custo_maximo",
+        "de": null,
+        "para": 0.0
+      },
+      {
+        "campo": "vendas_x_custo_minimo",
+        "de": null,
+        "para": 30.0
+      },
+      {
+        "campo": "vendas_x_prod_total_maximo",
+        "de": null,
+        "para": 30.0
+      },
+      {
+        "campo": "vendas_x_prod_total_minimo",
+        "de": null,
+        "para": 50.0
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "insumos_travados_maximo": 10.0,
+        "insumos_travados_minimo": 20.0,
+        "margem_alvo_minimo": 30.0,
+        "mes_ano": "2026-03-30",
+        "obs": "",
+        "vendas_x_custo_maximo": 0.0,
+        "vendas_x_custo_minimo": 30.0,
+        "vendas_x_prod_total_maximo": 30.0,
+        "vendas_x_prod_total_minimo": 50.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Hedge Policy: criado com os valores created_by: admin, cultura: Soja, grupos: [1], id: 2, insumos_travados_maximo: 10.0, insumos_travados_minimo: 20.0, margem_alvo_minimo: 30.0, mes_ano: 2026-03-30, obs: , safra: 25/26, subgrupos: [2], tenant: SDT, vendas_x_custo_maximo: 0.0, vendas_x_custo_minimo: 30.0, vendas_x_prod_total_maximo: 30.0, vendas_x_prod_total_minimo: 50.0.",
+    "created_at": "2026-03-17T17:19:58.358Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 20,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Hedge Policy",
+    "content_type": 38,
+    "object_id": 1,
+    "action": "alterado",
+    "alteracoes": [
+      {
+        "campo": "mes_ano",
+        "de": "2026-03-30",
+        "para": "2026-05-30"
+      },
+      {
+        "campo": "vendas_x_custo_maximo",
+        "de": 0.0,
+        "para": 30.0
+      },
+      {
+        "campo": "vendas_x_custo_minimo",
+        "de": 30.0,
+        "para": 50.0
+      },
+      {
+        "campo": "vendas_x_prod_total_maximo",
+        "de": 30.0,
+        "para": 50.0
+      },
+      {
+        "campo": "vendas_x_prod_total_minimo",
+        "de": 50.0,
+        "para": 60.0
+      }
+    ],
+    "changes_json": {
+      "before": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "insumos_travados_maximo": 10.0,
+        "insumos_travados_minimo": 20.0,
+        "margem_alvo_minimo": 30.0,
+        "mes_ano": "2026-03-30",
+        "obs": "",
+        "vendas_x_custo_maximo": 0.0,
+        "vendas_x_custo_minimo": 30.0,
+        "vendas_x_prod_total_maximo": 30.0,
+        "vendas_x_prod_total_minimo": 50.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      },
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "insumos_travados_maximo": 10.0,
+        "insumos_travados_minimo": 20.0,
+        "margem_alvo_minimo": 30.0,
+        "mes_ano": "2026-05-30",
+        "obs": "",
+        "vendas_x_custo_maximo": 30.0,
+        "vendas_x_custo_minimo": 50.0,
+        "vendas_x_prod_total_maximo": 50.0,
+        "vendas_x_prod_total_minimo": 60.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Hedge Policy: mes_ano: alterado de 2026-03-30 para 2026-05-30, vendas_x_custo_maximo: alterado de 0.0 para 30.0, vendas_x_custo_minimo: alterado de 30.0 para 50.0, vendas_x_prod_total_maximo: alterado de 30.0 para 50.0, vendas_x_prod_total_minimo: alterado de 50.0 para 60.0.",
+    "created_at": "2026-03-17T17:20:18.493Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 21,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Physical Sale",
+    "content_type": 28,
+    "object_id": 3,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "basis_moeda",
+        "de": null,
+        "para": "U$/bus"
+      },
+      {
+        "campo": "basis_valor",
+        "de": null,
+        "para": 1.0
+      },
+      {
+        "campo": "bolsa_ref",
+        "de": null,
+        "para": "soja_cbot"
+      },
+      {
+        "campo": "cif_fob",
+        "de": null,
+        "para": "CIF"
+      },
+      {
+        "campo": "compra_venda",
+        "de": null,
+        "para": "Venda"
+      },
+      {
+        "campo": "cotacao_bolsa_ref",
+        "de": null,
+        "para": 1.0
+      },
+      {
+        "campo": "created_by",
+        "de": null,
+        "para": "admin"
+      },
+      {
+        "campo": "cultura",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "cultura_produto",
+        "de": null,
+        "para": "Soja"
+      },
+      {
+        "campo": "data_entrega",
+        "de": null,
+        "para": "2026-05-10"
+      },
+      {
+        "campo": "data_negociacao",
+        "de": null,
+        "para": "2026-04-24"
+      },
+      {
+        "campo": "data_pagamento",
+        "de": null,
+        "para": "2026-08-20"
+      },
+      {
+        "campo": "dolar_de_venda",
+        "de": null,
+        "para": 5.5
+      },
+      {
+        "campo": "faturamento_total_contrato",
+        "de": null,
+        "para": 1080000.0
+      },
+      {
+        "campo": "grupos",
+        "de": null,
+        "para": [
+          1
+        ]
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "3"
+      },
+      {
+        "campo": "moeda_contrato",
+        "de": null,
+        "para": "U$"
+      },
+      {
+        "campo": "objetivo_venda_dolarizada",
+        "de": null,
+        "para": "Venda de componentes"
+      },
+      {
+        "campo": "pf_paf",
+        "de": null,
+        "para": "PF"
+      },
+      {
+        "campo": "preco",
+        "de": null,
+        "para": 24.0
+      },
+      {
+        "campo": "safra",
+        "de": null,
+        "para": "25/26"
+      },
+      {
+        "campo": "subgrupos",
+        "de": null,
+        "para": [
+          2
+        ]
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      },
+      {
+        "campo": "unidade_contrato",
+        "de": null,
+        "para": "sc"
+      },
+      {
+        "campo": "volume_fisico",
+        "de": null,
+        "para": 45000.0
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "3",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "basis_valor": 1.0,
+        "basis_moeda": "U$/bus",
+        "bolsa_ref": "soja_cbot",
+        "cif_fob": "CIF",
+        "compra_venda": "Venda",
+        "contraparte": null,
+        "cotacao_bolsa_ref": 1.0,
+        "cultura_produto": "Soja",
+        "data_entrega": "2026-05-10",
+        "data_negociacao": "2026-04-24",
+        "data_pagamento": "2026-08-20",
+        "dolar_de_venda": 5.5,
+        "faturamento_total_contrato": 1080000.0,
+        "moeda_contrato": "U$",
+        "objetivo_venda_dolarizada": "Venda de componentes",
+        "pf_paf": "PF",
+        "preco": 24.0,
+        "unidade_contrato": "sc",
+        "volume_fisico": 45000.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Physical Sale: criado com os valores basis_moeda: U$/bus, basis_valor: 1.0, bolsa_ref: soja_cbot, cif_fob: CIF, compra_venda: Venda, cotacao_bolsa_ref: 1.0, created_by: admin, cultura: Soja, cultura_produto: Soja, data_entrega: 2026-05-10, data_negociacao: 2026-04-24, data_pagamento: 2026-08-20, dolar_de_venda: 5.5, faturamento_total_contrato: 1080000.0, grupos: [1], id: 3, moeda_contrato: U$, objetivo_venda_dolarizada: Venda de componentes, pf_paf: PF, preco: 24.0, safra: 25/26, subgrupos: [2], tenant: SDT, unidade_contrato: sc, volume_fisico: 45000.0.",
+    "created_at": "2026-03-17T17:20:54.111Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 22,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Counterparty",
+    "content_type": 15,
+    "object_id": 1,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "grupo",
+        "de": null,
+        "para": "Frankanna"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "1"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": "Coop. Frisia"
+      },
+      {
+        "campo": "subgrupo",
+        "de": null,
+        "para": "Frank_PR"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "1",
+        "tenant": "SDT",
+        "subgrupo": "Frank_PR",
+        "grupo": "Frankanna",
+        "obs": "Coop. Frisia"
+      }
+    },
+    "description": "Counterparty: criado com os valores grupo: Frankanna, id: 1, obs: Coop. Frisia, subgrupo: Frank_PR, tenant: SDT.",
+    "created_at": "2026-03-17T17:23:59.650Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 23,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Counterparty",
+    "content_type": 15,
+    "object_id": 2,
+    "action": "criado",
+    "alteracoes": [
+      {
+        "campo": "grupo",
+        "de": null,
+        "para": "Rickli"
+      },
+      {
+        "campo": "id",
+        "de": null,
+        "para": "2"
+      },
+      {
+        "campo": "obs",
+        "de": null,
+        "para": "CAMP"
+      },
+      {
+        "campo": "subgrupo",
+        "de": null,
+        "para": "OR_PR"
+      },
+      {
+        "campo": "tenant",
+        "de": null,
+        "para": "SDT"
+      }
+    ],
+    "changes_json": {
+      "before": {},
+      "after": {
+        "id": "2",
+        "tenant": "SDT",
+        "subgrupo": "OR_PR",
+        "grupo": "Rickli",
+        "obs": "CAMP"
+      }
+    },
+    "description": "Counterparty: criado com os valores grupo: Rickli, id: 2, obs: CAMP, subgrupo: OR_PR, tenant: SDT.",
+    "created_at": "2026-03-17T17:26:11.804Z"
+  }
+},
+{
+  "model": "auditing.auditlog",
+  "pk": 24,
+  "fields": {
+    "tenant": 1,
+    "user": 1,
+    "formulario": "Physical Sale",
+    "content_type": 28,
+    "object_id": 3,
+    "action": "alterado",
+    "alteracoes": [
+      {
+        "campo": "contraparte",
+        "de": null,
+        "para": "Frankanna / Frank_PR"
+      }
+    ],
+    "changes_json": {
+      "before": {
+        "id": "3",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "basis_valor": 1.0,
+        "basis_moeda": "U$/bus",
+        "bolsa_ref": "soja_cbot",
+        "cif_fob": "CIF",
+        "compra_venda": "Venda",
+        "contraparte": null,
+        "cotacao_bolsa_ref": 1.0,
+        "cultura_produto": "Soja",
+        "data_entrega": "2026-05-10",
+        "data_negociacao": "2026-04-24",
+        "data_pagamento": "2026-08-20",
+        "dolar_de_venda": 5.5,
+        "faturamento_total_contrato": 1080000.0,
+        "moeda_contrato": "U$",
+        "objetivo_venda_dolarizada": "Venda de componentes",
+        "pf_paf": "PF",
+        "preco": 24.0,
+        "unidade_contrato": "sc",
+        "volume_fisico": 45000.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      },
+      "after": {
+        "id": "3",
+        "tenant": "SDT",
+        "created_by": "admin",
+        "cultura": "Soja",
+        "safra": "25/26",
+        "basis_valor": 1.0,
+        "basis_moeda": "U$/bus",
+        "bolsa_ref": "soja_cbot",
+        "cif_fob": "CIF",
+        "compra_venda": "Venda",
+        "contraparte": "Frankanna / Frank_PR",
+        "cotacao_bolsa_ref": 1.0,
+        "cultura_produto": "Soja",
+        "data_entrega": "2026-05-10",
+        "data_negociacao": "2026-04-24",
+        "data_pagamento": "2026-08-20",
+        "dolar_de_venda": 5.5,
+        "faturamento_total_contrato": 1080000.0,
+        "moeda_contrato": "U$",
+        "objetivo_venda_dolarizada": "Venda de componentes",
+        "pf_paf": "PF",
+        "preco": 24.0,
+        "unidade_contrato": "sc",
+        "volume_fisico": 45000.0,
+        "grupos": [
+          1
+        ],
+        "subgrupos": [
+          2
+        ]
+      }
+    },
+    "description": "Physical Sale: contraparte: alterado de None para Frankanna / Frank_PR.",
+    "created_at": "2026-03-17T17:26:23.134Z"
+  }
+}
+]
