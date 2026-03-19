@@ -13,6 +13,7 @@ from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperation
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
 from apps.derivatives.views import DerivativeOperationViewSet, derivative_contracts
 from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
+from apps.leads.views import LeadCreateView
 from apps.physical.views import (
     ActualCostViewSet,
     BudgetCostViewSet,
@@ -72,6 +73,7 @@ urlpatterns = [
     path("api/auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
     path("api/auth/reset-password-confirm/", ResetPasswordConfirmView.as_view(), name="reset_password_confirm"),
     path("api/auth/request-access/", AccessRequestView.as_view(), name="request_access"),
+    path("api/leads/", LeadCreateView.as_view(), name="lead_create"),
 ]
 
 if settings.DEBUG:

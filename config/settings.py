@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "apps.marketdata",
     "apps.risk",
     "apps.auditing",
+    "apps.leads",
 ]
 
 MIDDLEWARE = [
