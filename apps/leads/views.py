@@ -1,9 +1,13 @@
+import logging
+
 from django.conf import settings
 from django.core.mail import send_mail
 from rest_framework import permissions, response, status
 from rest_framework.views import APIView
 
 from .serializers import LeadSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class LeadCreateView(APIView):
@@ -32,15 +36,20 @@ class LeadCreateView(APIView):
             ]
         )
 
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            ["evandrogoes@agrosaldaterra.com.br"],
-            fail_silently=False,
-        )
+        mail_warning = None
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                ["evandrogoes@agrosaldaterra.com.br"],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            mail_warning = "Lead salvo, mas o envio de e-mail falhou."
+            logger.exception("Falha ao enviar e-mail do lead %s", lead.id, exc_info=exc)
 
         return response.Response(
-            {"detail": "Lead cadastrado com sucesso.", "lead": serializer.data},
+            {"detail": "Lead cadastrado com sucesso.", "lead": serializer.data, "mail_warning": mail_warning},
             status=status.HTTP_201_CREATED,
         )
