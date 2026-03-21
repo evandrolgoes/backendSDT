@@ -11,7 +11,12 @@ from apps.accounts.views import AccessRequestView, ForgotPasswordView, LoginView
 from apps.auditing.views import AttachmentViewSet, AuditLogViewSet
 from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperationNameViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
-from apps.derivatives.views import DerivativeOperationViewSet, derivative_contracts
+from apps.derivatives.views import (
+    DerivativeOperationViewSet,
+    derivative_contracts,
+    import_bubble_derivatives,
+    inspect_bubble_import,
+)
 from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
 from apps.leads.views import LeadCreateView
 from apps.physical.views import (
@@ -65,6 +70,8 @@ urlpatterns = [
     path("api/", include(router.urls)),
     path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
     path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
+    path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),
+    path("api/import-tools/bubble/derivatives/", import_bubble_derivatives, name="import_bubble_derivatives"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/auth/login/", LoginView.as_view(), name="login"),
