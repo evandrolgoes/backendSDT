@@ -49,12 +49,28 @@ class ClientAccountSerializer(TenantScopedSerializer):
 
 
 class EconomicGroupSerializer(TenantScopedSerializer):
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        tenant = attrs.get("tenant") or getattr(self.instance, "tenant", None)
+        if tenant is not None and self.instance is None and tenant.max_groups is not None:
+            if EconomicGroup.objects.filter(tenant=tenant).count() >= tenant.max_groups:
+                raise serializers.ValidationError({"grupo": f"Limite de grupos atingido para o tenant {tenant.name}."})
+        return attrs
+
     class Meta:
         model = EconomicGroup
         fields = "__all__"
 
 
 class SubGroupSerializer(TenantScopedSerializer):
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        tenant = attrs.get("tenant") or getattr(self.instance, "tenant", None)
+        if tenant is not None and self.instance is None and tenant.max_subgroups is not None:
+            if SubGroup.objects.filter(tenant=tenant).count() >= tenant.max_subgroups:
+                raise serializers.ValidationError({"subgrupo": f"Limite de subgrupos atingido para o tenant {tenant.name}."})
+        return attrs
+
     class Meta:
         model = SubGroup
         fields = "__all__"

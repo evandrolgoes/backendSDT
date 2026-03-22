@@ -1,0 +1,44 @@
+AVAILABLE_MODULES = [
+    ("dashboard_summary", "Dashboard: Resumo"),
+    ("dashboard_cashflow", "Dashboard: Fluxo de Caixa"),
+    ("dashboard_strategies_triggers", "Dashboard: Estrategias e Gatilhos"),
+    ("dashboard_hedge_policy", "Dashboard: Politica de Hedge"),
+    ("dashboard_price_composition", "Dashboard: Composicao de Precos"),
+    ("dashboard_component_sales", "Dashboard: Venda de Componentes"),
+    ("dashboard_currency_exposure", "Dashboard: Exposicao e Hedge Cambial"),
+    ("dashboard_simulations", "Dashboard: Simulacoes"),
+    ("dashboard_mtm", "Dashboard: MTM"),
+    ("cad_groups", "Cadastro: Grupos"),
+    ("cad_subgroups", "Cadastro: Subgrupos"),
+    ("cad_counterparties", "Cadastro: Contrapartes"),
+    ("ops_physical_quotes", "Operacoes: Cotacoes Fisico"),
+    ("ops_budget_costs", "Operacoes: Custo Orcamento"),
+    ("ops_actual_costs", "Operacoes: Custo Realizado"),
+    ("ops_physical_payments", "Operacoes: Pgtos Fisico"),
+    ("ops_cash_payments", "Operacoes: Pgtos Caixa"),
+    ("ops_derivatives", "Operacoes: Derivativos"),
+    ("ops_strategies", "Operacoes: Estrategias"),
+    ("ops_triggers", "Operacoes: Gatilhos"),
+    ("ops_hedge_policies", "Operacoes: Politica de Hedge"),
+    ("ops_crop_boards", "Operacoes: Quadro Safra"),
+    ("ops_physical_sales", "Operacoes: Vendas Fisico"),
+    ("sys_tenants", "Sistema: Tenants"),
+    ("sys_crops", "Sistema: Culturas"),
+    ("sys_currencies", "Sistema: Moedas"),
+    ("sys_units", "Sistema: Unidades"),
+    ("sys_price_units", "Sistema: Moeda/Unidade"),
+    ("sys_exchanges", "Sistema: Bolsas"),
+    ("sys_derivative_operation_names", "Sistema: Nome Operacoes Derivativos"),
+    ("sys_seasons", "Sistema: Safras"),
+    ("sys_users", "Sistema: Usuarios"),
+    ("sys_invites", "Sistema: Convites"),
+    ("sys_logs", "Sistema: Logs"),
+    ("sys_json_import", "Sistema: Importador JSON"),
+]
+
+AVAILABLE_MODULE_CODES = [code for code, _label in AVAILABLE_MODULES]
+AVAILABLE_MODULE_CHOICES = tuple(AVAILABLE_MODULES)
+
+
+def default_enabled_modules():
+    return list(AVAILABLE_MODULE_CODES)

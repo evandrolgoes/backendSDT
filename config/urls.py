@@ -7,7 +7,19 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.accounts.views import AccessRequestView, ForgotPasswordView, LoginView, ResetPasswordConfirmView, TenantViewSet, UserViewSet, me
+from apps.accounts.views import (
+    AccessRequestView,
+    ForgotPasswordView,
+    InvitationAcceptView,
+    InvitationDetailByTokenView,
+    InvitationViewSet,
+    ImpersonateUserView,
+    LoginView,
+    ResetPasswordConfirmView,
+    TenantViewSet,
+    UserViewSet,
+    me,
+)
 from apps.auditing.views import AttachmentViewSet, AuditLogViewSet
 from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperationNameViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
@@ -33,6 +45,7 @@ from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, Strategy
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
 router.register("users", UserViewSet, basename="user")
+router.register("invitations", InvitationViewSet, basename="invitation")
 router.register("clients", ClientAccountViewSet, basename="client")
 router.register("groups", EconomicGroupViewSet, basename="group")
 router.register("subgroups", SubGroupViewSet, basename="subgroup")
@@ -75,11 +88,14 @@ urlpatterns = [
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/auth/login/", LoginView.as_view(), name="login"),
+    path("api/auth/impersonate/<int:user_id>/", ImpersonateUserView.as_view(), name="impersonate_user"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/me/", me, name="me"),
     path("api/auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
     path("api/auth/reset-password-confirm/", ResetPasswordConfirmView.as_view(), name="reset_password_confirm"),
     path("api/auth/request-access/", AccessRequestView.as_view(), name="request_access"),
+    path("api/auth/invitations/<str:token>/", InvitationDetailByTokenView.as_view(), name="invitation_detail_by_token"),
+    path("api/auth/invitations/<str:token>/accept/", InvitationAcceptView.as_view(), name="invitation_accept"),
     path("api/leads/", LeadCreateView.as_view(), name="lead_create"),
 ]
 

@@ -1,14 +1,18 @@
 from rest_framework import generics, permissions, response, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from apps.core.permissions import IsMasterAdmin, IsMasterAdminOrTenantUser
+from apps.core.permissions import IsMasterAdmin, IsMasterAdminOrTenantManager, IsMasterAdminOrTenantUser
 from apps.core.viewsets import TenantScopedModelViewSet
-from .models import Tenant, User
+from .models import Invitation, Tenant, User
 from .serializers import (
     AccessRequestSerializer,
     ForgotPasswordSerializer,
+    InvitationAcceptSerializer,
+    InvitationLookupSerializer,
+    InvitationSerializer,
     LoginSerializer,
     ResetPasswordConfirmSerializer,
     TenantSerializer,
@@ -86,7 +90,63 @@ class TenantViewSet(TenantScopedModelViewSet):
 class UserViewSet(TenantScopedModelViewSet):
     queryset = User.objects.select_related("tenant").prefetch_related("user_roles__role", "assigned_groups", "assigned_subgroups").all()
     serializer_class = UserSerializer
-    permission_classes = [IsMasterAdminOrTenantUser]
+    permission_classes = [IsMasterAdminOrTenantManager]
     filterset_fields = ["tenant", "is_active", "is_staff"]
     search_fields = ["username", "email", "full_name"]
     ordering_fields = ["username", "created_at"]
+
+
+class ImpersonateUserView(APIView):
+    permission_classes = [IsMasterAdminOrTenantManager]
+
+    def post(self, request, user_id, *args, **kwargs):
+        actor = request.user
+        target_user = generics.get_object_or_404(User.objects.select_related("tenant"), pk=user_id)
+
+        if not actor.is_superuser:
+            if not actor.tenant_id or actor.tenant_id != target_user.tenant_id:
+                return response.Response({"detail": "Voce so pode acessar usuarios do seu proprio tenant."}, status=status.HTTP_403_FORBIDDEN)
+            if target_user.is_superuser:
+                return response.Response({"detail": "Nao e permitido impersonar superusuario."}, status=status.HTTP_403_FORBIDDEN)
+
+        refresh = RefreshToken.for_user(target_user)
+        user_data = UserSerializer(target_user, context={"request": request}).data
+        return response.Response(
+            {"access": str(refresh.access_token), "refresh": str(refresh), "user": user_data},
+            status=status.HTTP_200_OK,
+        )
+
+
+class InvitationViewSet(TenantScopedModelViewSet):
+    queryset = Invitation.objects.select_related("tenant", "invited_by").all()
+    serializer_class = InvitationSerializer
+    permission_classes = [IsMasterAdminOrTenantManager]
+    filterset_fields = ["tenant", "status"]
+    search_fields = ["email"]
+    ordering_fields = ["created_at", "expires_at", "status"]
+
+
+class InvitationDetailByTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self, token):
+        return generics.get_object_or_404(Invitation.objects.select_related("tenant"), token=token)
+
+    def get(self, request, token, *args, **kwargs):
+        invitation = self.get_object(token)
+        serializer = InvitationLookupSerializer(invitation)
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class InvitationAcceptView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self, token):
+        return generics.get_object_or_404(Invitation.objects.select_related("tenant"), token=token)
+
+    def post(self, request, token, *args, **kwargs):
+        invitation = self.get_object(token)
+        serializer = InvitationAcceptSerializer(data=request.data, context={"invitation": invitation})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response({"detail": "Conta criada com sucesso. Agora voce ja pode entrar no sistema."}, status=status.HTTP_201_CREATED)
