@@ -85,9 +85,11 @@ INSTALLED_APPS = [
     "apps.derivatives",
     "apps.strategies",
     "apps.marketdata",
+    "apps.mercado",
     "apps.risk",
     "apps.auditing",
     "apps.leads",
+    "apps.tradingview_scraper",
 ]
 
 MIDDLEWARE = [
@@ -193,13 +195,13 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
 }
 
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", cast=Csv(), default="http://localhost:5173")
+CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", cast=Csv(), default="http://localhost:5174")
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
     r"^http://127\.0\.0\.1:\d+$",
 ]
 
-FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5174")
 ACCESS_REQUEST_NOTIFY_EMAIL = config("ACCESS_REQUEST_NOTIFY_EMAIL", default="evandrogoes@agrosaldaterra.com.br")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@sdt.local")
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")

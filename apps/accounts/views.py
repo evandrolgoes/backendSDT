@@ -1,14 +1,22 @@
+from django.db import models
 from rest_framework import generics, permissions, response, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from apps.core.permissions import IsMasterAdmin, IsMasterAdminOrTenantManager, IsMasterAdminOrTenantUser
+from apps.core.permissions import (
+    IsMasterAdmin,
+    IsMasterAdminOrInvitationTenantAdmin,
+    IsMasterAdminOrTenantAdmin,
+    IsMasterAdminOrTenantManager,
+    IsMasterAdminOrTenantUser,
+)
 from apps.core.viewsets import TenantScopedModelViewSet
 from .models import Invitation, Tenant, User
 from .serializers import (
     AccessRequestSerializer,
+    AdminInvitationSerializer,
     ForgotPasswordSerializer,
     InvitationAcceptSerializer,
     InvitationLookupSerializer,
@@ -88,12 +96,23 @@ class TenantViewSet(TenantScopedModelViewSet):
 
 
 class UserViewSet(TenantScopedModelViewSet):
-    queryset = User.objects.select_related("tenant").prefetch_related("user_roles__role", "assigned_groups", "assigned_subgroups").all()
+    queryset = User.objects.select_related("tenant").prefetch_related("assigned_groups", "assigned_subgroups").all()
     serializer_class = UserSerializer
-    permission_classes = [IsMasterAdminOrTenantManager]
-    filterset_fields = ["tenant", "is_active", "is_staff"]
+    permission_classes = [IsMasterAdminOrTenantAdmin]
+    filterset_fields = ["tenant", "is_active", "role"]
     search_fields = ["username", "email", "full_name"]
     ordering_fields = ["username", "created_at"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.is_superuser:
+            return queryset
+        if self.request.user.has_tenant_slug("admin"):
+            return queryset
+        if self.request.user.has_tenant_slug("consultor"):
+            root_user = self.request.user.get_master_root()
+            return queryset.filter(models.Q(tenant=self.request.user.tenant) | models.Q(tenant__slug="usuario", master_user=root_user))
+        return queryset.filter(tenant=self.request.user.tenant)
 
 
 class ImpersonateUserView(APIView):
@@ -104,7 +123,8 @@ class ImpersonateUserView(APIView):
         target_user = generics.get_object_or_404(User.objects.select_related("tenant"), pk=user_id)
 
         if not actor.is_superuser:
-            if not actor.tenant_id or actor.tenant_id != target_user.tenant_id:
+            accessible_tenant_ids = actor.get_accessible_tenant_ids()
+            if not actor.tenant_id or target_user.tenant_id not in accessible_tenant_ids:
                 return response.Response({"detail": "Voce so pode acessar usuarios do seu proprio tenant."}, status=status.HTTP_403_FORBIDDEN)
             if target_user.is_superuser:
                 return response.Response({"detail": "Nao e permitido impersonar superusuario."}, status=status.HTTP_403_FORBIDDEN)
@@ -118,12 +138,55 @@ class ImpersonateUserView(APIView):
 
 
 class InvitationViewSet(TenantScopedModelViewSet):
-    queryset = Invitation.objects.select_related("tenant", "invited_by").all()
+    queryset = Invitation.objects.select_related("tenant", "invited_by", "accepted_user").all()
     serializer_class = InvitationSerializer
-    permission_classes = [IsMasterAdminOrTenantManager]
+    permission_classes = [IsMasterAdminOrInvitationTenantAdmin]
     filterset_fields = ["tenant", "status"]
     search_fields = ["email"]
     ordering_fields = ["created_at", "expires_at", "status"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset().filter(kind=Invitation.Kind.INTERNAL_USER)
+        if self.request.user.is_superuser:
+            return queryset
+        return queryset.filter(tenant=self.request.user.tenant)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["invitation_kind"] = Invitation.Kind.INTERNAL_USER
+        return context
+
+    def perform_destroy(self, instance):
+        accepted_user = instance.accepted_user
+        super().perform_destroy(instance)
+        if accepted_user and accepted_user.pk:
+            accepted_user.delete()
+
+
+class AdminInvitationViewSet(TenantScopedModelViewSet):
+    queryset = Invitation.objects.select_related("tenant", "invited_by", "accepted_user").all()
+    serializer_class = AdminInvitationSerializer
+    permission_classes = [IsMasterAdminOrInvitationTenantAdmin]
+    filterset_fields = ["tenant", "status"]
+    search_fields = ["email", "target_tenant_name", "target_tenant_slug"]
+    ordering_fields = ["created_at", "expires_at", "status"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset().exclude(kind=Invitation.Kind.INTERNAL_USER)
+        if self.request.user.is_superuser:
+            return queryset
+        return queryset.filter(tenant=self.request.user.tenant)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["invitation_kind"] = Invitation.Kind.PLATFORM_ADMIN
+        return context
+
+    def perform_destroy(self, instance):
+        accepted_user = instance.accepted_user
+        super().perform_destroy(instance)
+        if accepted_user and accepted_user.pk:
+            accepted_user.delete()
 
 
 class InvitationDetailByTokenView(APIView):

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.core.models import TenantAwareModel, TimeStampedModel
@@ -27,6 +28,18 @@ class ClientAccount(TenantAwareModel, TimeStampedModel):
 
 class EconomicGroup(TenantAwareModel):
     grupo = models.CharField(max_length=120, null=True, blank=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="owned_groups",
+    )
+    users_with_access = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="accessible_groups",
+    )
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["tenant", "grupo"], name="uq_group_name_tenant")]
@@ -38,6 +51,19 @@ class EconomicGroup(TenantAwareModel):
 
 class SubGroup(TenantAwareModel):
     subgrupo = models.CharField(max_length=120, null=True, blank=True)
+    descricao = models.TextField(blank=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="owned_subgroups",
+    )
+    users_with_access = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="accessible_subgroups",
+    )
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["tenant", "subgrupo"], name="uq_subgroup_name_tenant")]
@@ -78,3 +104,83 @@ class Broker(TenantAwareModel):
 
     def __str__(self):
         return self.name
+
+
+class GroupAccessRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendente"
+        APPROVED = "approved", "Aprovado"
+        REJECTED = "rejected", "Rejeitado"
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="group_access_requests",
+    )
+    group = models.ForeignKey(
+        EconomicGroup,
+        on_delete=models.CASCADE,
+        related_name="access_requests",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_group_access_requests",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["requester", "group"],
+                condition=models.Q(status="pending"),
+                name="uq_pending_group_access_request",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.requester} -> {self.group}"
+
+
+class SubGroupAccessRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendente"
+        APPROVED = "approved", "Aprovado"
+        REJECTED = "rejected", "Rejeitado"
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subgroup_access_requests",
+    )
+    subgroup = models.ForeignKey(
+        SubGroup,
+        on_delete=models.CASCADE,
+        related_name="access_requests",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_subgroup_access_requests",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["requester", "subgroup"],
+                condition=models.Q(status="pending"),
+                name="uq_pending_subgroup_access_request",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.requester} -> {self.subgroup}"

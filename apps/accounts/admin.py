@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
 from .constants import AVAILABLE_MODULE_CHOICES, AVAILABLE_MODULE_CODES
-from .models import Invitation, Role, Tenant, User, UserRole
+from .models import Invitation, Tenant, User
 
 
 class TenantAdminForm(forms.ModelForm):
@@ -33,59 +33,83 @@ class TenantAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "slug",
-        "subscription_status",
-        "max_groups",
-        "max_subgroups",
-        "max_users",
-        "max_invitations",
-        "current_groups",
-        "current_subgroups",
-        "current_users",
-        "current_invitations",
+        "requires_master_user",
+        "can_send_invitations",
+        "can_register_groups",
+        "can_register_subgroups",
         "created_at",
     )
     search_fields = ("name", "slug")
-    readonly_fields = ("current_groups", "current_subgroups", "current_users", "current_invitations", "created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at")
     fieldsets = (
-        ("Identificacao", {"fields": ("name", "slug", "description", "subscription_status", "expires_at")}),
-        ("Limites contratados", {"fields": ("max_groups", "max_subgroups", "max_users", "max_invitations")}),
-        ("Uso atual", {"fields": ("current_groups", "current_subgroups", "current_users", "current_invitations")}),
+        (
+            "Identificacao",
+            {
+                "fields": (
+                    "name",
+                    "slug",
+                    "requires_master_user",
+                    "can_send_invitations",
+                    "can_register_groups",
+                    "can_register_subgroups",
+                )
+            },
+        ),
         ("Modulos", {"fields": ("enabled_modules",)}),
         ("Sistema", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
-    @admin.display(description="Grupos atuais")
-    def current_groups(self, obj):
-        return obj.economicgroups.count()
-
-    @admin.display(description="Subgrupos atuais")
-    def current_subgroups(self, obj):
-        return obj.subgroups.count()
-
-    @admin.display(description="Usuarios atuais")
-    def current_users(self, obj):
-        return obj.users.filter(is_superuser=False).count()
-
-    @admin.display(description="Convites atuais")
-    def current_invitations(self, obj):
-        return obj.invitations.filter(status__in=[Invitation.Status.PENDING, Invitation.Status.SENT]).count()
-
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
-    list_display = ("username", "email", "full_name", "tenant", "user_type", "access_status", "is_active", "is_staff")
-    fieldsets = DjangoUserAdmin.fieldsets + (
-        ("Hedge Position", {"fields": ("tenant", "full_name", "phone", "user_type", "access_status", "assigned_groups", "assigned_subgroups")}),
+    list_display = (
+        "username",
+        "email",
+        "full_name",
+        "tenant",
+        "role",
+        "master_user",
+        "max_admin_invitations",
+        "max_owned_groups",
+        "max_owned_subgroups",
+        "access_status",
+        "is_active",
     )
-    filter_horizontal = ("assigned_groups", "assigned_subgroups", "groups", "user_permissions")
+    fieldsets = (
+        (None, {"fields": ("username", "password")}),
+        ("Informacoes pessoais", {"fields": ("first_name", "last_name", "full_name", "email", "phone")}),
+        (
+            "Hedge Position",
+            {
+                "fields": (
+                    "tenant",
+                    "role",
+                    "master_user",
+                    "max_admin_invitations",
+                    "max_owned_groups",
+                    "max_owned_subgroups",
+                    "access_status",
+                )
+            },
+        ),
+        ("Permissoes", {"fields": ("is_active", "is_superuser", "groups", "user_permissions")}),
+        ("Datas importantes", {"fields": ("last_login", "date_joined")}),
+    )
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("username", "email", "full_name", "password1", "password2"),
+            },
+        ),
+    )
+    filter_horizontal = ("groups", "user_permissions")
 
 
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "email", "tenant", "user_type", "status", "invited_by", "created_at")
-    search_fields = ("full_name", "email", "tenant__name")
-    list_filter = ("status", "user_type", "tenant")
-
-
-admin.site.register(Role)
-admin.site.register(UserRole)
+    list_display = ("email", "kind", "tenant", "target_tenant_name", "status", "invited_by", "created_at")
+    search_fields = ("full_name", "email", "tenant__name", "target_tenant_name", "target_tenant_slug")
+    list_filter = ("kind", "status", "tenant")
+    filter_horizontal = ("assigned_groups", "assigned_subgroups")

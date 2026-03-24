@@ -18,6 +18,18 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    def get_file_url(self, obj):
+        if not getattr(obj, "file", None):
+            return ""
+        try:
+            url = obj.file.url
+        except ValueError:
+            return ""
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
+
     class Meta:
         model = Attachment
         fields = "__all__"

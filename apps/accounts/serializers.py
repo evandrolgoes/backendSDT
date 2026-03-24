@@ -14,12 +14,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.clients.models import EconomicGroup, SubGroup
 from .constants import AVAILABLE_MODULE_CODES, AVAILABLE_MODULE_CHOICES
-from .models import Invitation, Role, Tenant, User, UserRole
+from .models import Invitation, Tenant, User
 
 
 def send_invitation_email(invitation):
     invite_url = f"{settings.FRONTEND_URL.rstrip('/')}/abrir-conta/{invitation.token}"
-    tenant_name = invitation.tenant.name if invitation.tenant_id else "Hedge Position"
+    tenant_name = invitation.target_tenant_name or (invitation.tenant.name if invitation.tenant_id else "Hedge Position")
     subject = f"Convite para acessar {tenant_name}"
     message = (
         f"Voce recebeu um convite para criar sua conta em {tenant_name}.\n\n"
@@ -35,29 +35,17 @@ class TenantSerializer(serializers.ModelSerializer):
         required=False,
         allow_empty=True,
     )
-    current_groups = serializers.SerializerMethodField()
-    current_subgroups = serializers.SerializerMethodField()
-    current_users = serializers.SerializerMethodField()
-    current_invitations = serializers.SerializerMethodField()
-
     class Meta:
         model = Tenant
         fields = [
             "id",
             "name",
             "slug",
-            "description",
-            "subscription_status",
-            "expires_at",
-            "max_groups",
-            "max_subgroups",
-            "max_users",
-            "max_invitations",
+            "requires_master_user",
+            "can_send_invitations",
+            "can_register_groups",
+            "can_register_subgroups",
             "enabled_modules",
-            "current_groups",
-            "current_subgroups",
-            "current_users",
-            "current_invitations",
             "created_at",
             "updated_at",
         ]
@@ -84,50 +72,21 @@ class TenantSerializer(serializers.ModelSerializer):
             validated_data["enabled_modules"] = list(AVAILABLE_MODULE_CODES)
         return super().update(instance, validated_data)
 
-    def get_current_groups(self, obj):
-        return obj.economicgroups.count()
-
-    def get_current_subgroups(self, obj):
-        return obj.subgroups.count()
-
-    def get_current_users(self, obj):
-        return obj.users.filter(is_superuser=False).count()
-
-    def get_current_invitations(self, obj):
-        return obj.invitations.filter(status__in=[Invitation.Status.PENDING, Invitation.Status.SENT]).count()
-
-
-class RoleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Role
-        fields = ["id", "code", "name"]
-
-
-class UserRoleSerializer(serializers.ModelSerializer):
-    role = RoleSerializer(read_only=True)
-    role_id = serializers.PrimaryKeyRelatedField(source="role", queryset=Role.objects.all(), write_only=True)
-
-    class Meta:
-        model = UserRole
-        fields = ["id", "role", "role_id"]
-
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
-    user_roles = UserRoleSerializer(many=True, read_only=True)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     tenant_slug = serializers.CharField(source="tenant.slug", read_only=True)
-    tenant_description = serializers.CharField(source="tenant.description", read_only=True)
-    tenant_max_groups = serializers.IntegerField(source="tenant.max_groups", read_only=True)
-    tenant_max_subgroups = serializers.IntegerField(source="tenant.max_subgroups", read_only=True)
-    tenant_max_users = serializers.IntegerField(source="tenant.max_users", read_only=True)
-    tenant_max_invitations = serializers.IntegerField(source="tenant.max_invitations", read_only=True)
-    tenant_current_groups = serializers.SerializerMethodField()
-    tenant_current_subgroups = serializers.SerializerMethodField()
-    tenant_current_users = serializers.SerializerMethodField()
-    tenant_current_invitations = serializers.SerializerMethodField()
-    assigned_groups = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
-    assigned_subgroups = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
+    tenant_requires_master_user = serializers.BooleanField(source="tenant.requires_master_user", read_only=True)
+    tenant_can_send_invitations = serializers.BooleanField(source="tenant.can_send_invitations", read_only=True)
+    tenant_can_register_groups = serializers.BooleanField(source="tenant.can_register_groups", read_only=True)
+    tenant_can_register_subgroups = serializers.BooleanField(source="tenant.can_register_subgroups", read_only=True)
+    active_admin_invitations_count = serializers.SerializerMethodField()
+    owned_groups_count = serializers.SerializerMethodField()
+    owned_subgroups_count = serializers.SerializerMethodField()
+    carteira_name = serializers.CharField(source="master_user.full_name", read_only=True)
+    master_user_name = serializers.CharField(source="master_user.full_name", read_only=True)
+    master_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
     effective_modules = serializers.SerializerMethodField()
 
     def get_fields(self):
@@ -136,13 +95,18 @@ class UserSerializer(serializers.ModelSerializer):
         if request and getattr(request.user, "is_authenticated", False) and "tenant" in fields and not request.user.is_superuser:
             fields["tenant"] = serializers.HiddenField(default=request.user.tenant)
         tenant = None
-        if request and getattr(request.user, "is_authenticated", False):
-            tenant = None if request.user.is_superuser else request.user.tenant
-        elif self.instance is not None:
-            tenant = self.instance.tenant
+        instance_obj = self.instance if isinstance(self.instance, User) else None
+        if instance_obj is not None and instance_obj.tenant_id:
+            tenant = instance_obj.tenant
+        elif request and getattr(request.user, "is_authenticated", False) and not request.user.is_superuser:
+            tenant = request.user.tenant
         if tenant is not None:
-            fields["assigned_groups"].queryset = EconomicGroup.objects.filter(tenant=tenant)
-            fields["assigned_subgroups"].queryset = SubGroup.objects.filter(tenant=tenant)
+            if getattr(tenant, "requires_master_user", False):
+                fields["master_user"].queryset = User.objects.all()
+            else:
+                fields["master_user"].queryset = User.objects.none()
+        if request and getattr(request.user, "is_authenticated", False) and request.user.is_superuser:
+            fields["master_user"].queryset = User.objects.all()
         return fields
 
     class Meta:
@@ -152,49 +116,44 @@ class UserSerializer(serializers.ModelSerializer):
             "tenant",
             "tenant_name",
             "tenant_slug",
-            "tenant_description",
-            "tenant_max_groups",
-            "tenant_max_subgroups",
-            "tenant_max_users",
-            "tenant_max_invitations",
-            "tenant_current_groups",
-            "tenant_current_subgroups",
-            "tenant_current_users",
-            "tenant_current_invitations",
+            "tenant_requires_master_user",
+            "tenant_can_send_invitations",
+            "tenant_can_register_groups",
+            "tenant_can_register_subgroups",
+            "active_admin_invitations_count",
+            "owned_groups_count",
+            "owned_subgroups_count",
+            "carteira_name",
+            "role",
+            "master_user",
+            "master_user_name",
             "username",
             "email",
             "full_name",
             "phone",
-            "user_type",
+            "max_admin_invitations",
+            "max_owned_groups",
+            "max_owned_subgroups",
             "access_status",
             "is_active",
-            "is_staff",
             "is_superuser",
-            "assigned_groups",
-            "assigned_subgroups",
             "effective_modules",
             "password",
             "created_at",
-            "user_roles",
         ]
         read_only_fields = ["created_at", "is_superuser", "effective_modules"]
 
     def get_effective_modules(self, obj):
         return obj.get_effective_modules()
 
-    def get_tenant_current_groups(self, obj):
-        return obj.tenant.economicgroups.count() if obj.tenant_id else 0
+    def get_active_admin_invitations_count(self, obj):
+        return obj.get_active_admin_invitation_count()
 
-    def get_tenant_current_subgroups(self, obj):
-        return obj.tenant.subgroups.count() if obj.tenant_id else 0
+    def get_owned_groups_count(self, obj):
+        return obj.get_owned_groups_count()
 
-    def get_tenant_current_users(self, obj):
-        return obj.tenant.users.filter(is_superuser=False).count() if obj.tenant_id else 0
-
-    def get_tenant_current_invitations(self, obj):
-        if not obj.tenant_id:
-            return 0
-        return obj.tenant.invitations.filter(status__in=[Invitation.Status.PENDING, Invitation.Status.SENT]).count()
+    def get_owned_subgroups_count(self, obj):
+        return obj.get_owned_subgroups_count()
 
     def validate_tenant(self, value):
         request = self.context["request"]
@@ -205,27 +164,27 @@ class UserSerializer(serializers.ModelSerializer):
         return request.user.tenant
 
     def create(self, validated_data):
-        assigned_groups = validated_data.pop("assigned_groups", [])
-        assigned_subgroups = validated_data.pop("assigned_subgroups", [])
+        request = self.context["request"]
         password = validated_data.pop("password", None)
-        if getattr(self.context["request"].user, "is_authenticated", False) and not self.context["request"].user.is_superuser:
-            validated_data["tenant"] = self.context["request"].user.tenant
+        if getattr(request.user, "is_authenticated", False) and not request.user.is_superuser:
+            if request.user.has_tenant_slug("admin", "consultor"):
+                validated_data["tenant"] = Tenant.objects.filter(slug="usuario").first() or request.user.tenant
+                validated_data["master_user"] = request.user.get_master_root()
+            else:
+                validated_data["tenant"] = request.user.tenant
+                validated_data["master_user"] = request.user.get_master_root()
         validated_data["allowed_modules"] = []
+        validated_data.setdefault("role", User.Role.STAFF)
         user = User(**validated_data)
         if password:
             user.set_password(password)
         else:
             user.set_unusable_password()
         user.save()
-        if assigned_groups:
-            user.assigned_groups.set(assigned_groups)
-        if assigned_subgroups:
-            user.assigned_subgroups.set(assigned_subgroups)
         return user
 
     def update(self, instance, validated_data):
-        assigned_groups = validated_data.pop("assigned_groups", None)
-        assigned_subgroups = validated_data.pop("assigned_subgroups", None)
+        request = self.context.get("request")
         password = validated_data.pop("password", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -233,41 +192,36 @@ class UserSerializer(serializers.ModelSerializer):
         if password:
             instance.set_password(password)
         instance.save()
-        if assigned_groups is not None:
-            instance.assigned_groups.set(assigned_groups)
-        if assigned_subgroups is not None:
-            instance.assigned_subgroups.set(assigned_subgroups)
         return instance
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        tenant = attrs.get("tenant")
+        tenant = attrs["tenant"] if "tenant" in attrs else None
         if tenant is None and self.instance is not None:
             tenant = self.instance.tenant
         request = self.context.get("request")
         if tenant is None and request and getattr(request.user, "is_authenticated", False) and not request.user.is_superuser:
             tenant = request.user.tenant
 
-        assigned_groups = attrs.get("assigned_groups")
-        assigned_subgroups = attrs.get("assigned_subgroups")
+        master_user = attrs["master_user"] if "master_user" in attrs else None
+        if "master_user" not in attrs and self.instance is not None:
+            master_user = self.instance.master_user
         if tenant is not None:
-            if self.instance is None and tenant.max_users is not None and tenant.users.count() >= tenant.max_users:
-                raise serializers.ValidationError({"tenant": f"Limite de usuarios atingido para o tenant {tenant.name}."})
-            if assigned_groups is not None:
-                invalid_groups = [group.grupo or str(group.pk) for group in assigned_groups if group.tenant_id != tenant.id]
-                if invalid_groups:
-                    raise serializers.ValidationError({"assigned_groups": f"Todos os grupos atribuidos devem pertencer ao tenant {tenant}."})
-            if assigned_subgroups is not None:
-                invalid_subgroups = [subgroup.subgrupo or str(subgroup.pk) for subgroup in assigned_subgroups if subgroup.tenant_id != tenant.id]
-                if invalid_subgroups:
-                    raise serializers.ValidationError({"assigned_subgroups": f"Todos os subgrupos atribuidos devem pertencer ao tenant {tenant}."})
+            assignment_tenant = tenant
+            if getattr(tenant, "requires_master_user", False):
+                if not master_user:
+                    raise serializers.ValidationError({"master_user": "Usuarios deste tenant devem ter uma carteira vinculada."})
+            else:
+                attrs["master_user"] = None
         return attrs
 
 
-class InvitationSerializer(serializers.ModelSerializer):
+class BaseInvitationSerializer(serializers.ModelSerializer):
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     invited_by_name = serializers.CharField(source="invited_by.full_name", read_only=True)
+    accepted_user_name = serializers.CharField(source="accepted_user.full_name", read_only=True)
     invite_url = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Invitation
@@ -275,31 +229,35 @@ class InvitationSerializer(serializers.ModelSerializer):
             "id",
             "tenant",
             "tenant_name",
+            "kind",
+            "target_tenant_name",
+            "target_tenant_slug",
             "email",
+            "assigned_groups",
+            "assigned_subgroups",
             "status",
             "expires_at",
             "invited_by",
             "invited_by_name",
+            "full_name",
+            "phone",
+            "message",
+            "accepted_user",
+            "accepted_user_name",
             "invite_url",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["invited_by", "tenant_name", "invited_by_name", "created_at", "updated_at"]
+        read_only_fields = ["invited_by", "tenant_name", "invited_by_name", "accepted_user", "accepted_user_name", "created_at", "updated_at"]
 
     def get_fields(self):
         fields = super().get_fields()
-        request = self.context.get("request")
-        if request and getattr(request.user, "is_authenticated", False) and "tenant" in fields and not request.user.is_superuser:
-            fields["tenant"] = serializers.HiddenField(default=request.user.tenant)
+        fields["assigned_groups"] = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
+        fields["assigned_subgroups"] = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
         return fields
 
     def validate_tenant(self, value):
-        request = self.context["request"]
-        if not getattr(request.user, "is_authenticated", False):
-            return value
-        if request.user.is_superuser:
-            return value
-        return request.user.tenant
+        return value
 
     def validate_email(self, value):
         return value.strip().lower()
@@ -307,42 +265,83 @@ class InvitationSerializer(serializers.ModelSerializer):
     def get_invite_url(self, obj):
         return f"{settings.FRONTEND_URL.rstrip('/')}/abrir-conta/{obj.token}"
 
+    def get_invitation_kind(self):
+        return self.context.get("invitation_kind")
+
+    def get_status(self, obj):
+        if obj.expires_at and obj.expires_at < timezone.localdate() and obj.status == Invitation.Status.PENDING:
+            return Invitation.Status.EXPIRED
+        return obj.status
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        invitation_kind = self.get_invitation_kind()
+        if not invitation_kind:
+            invitation_kind = attrs.get("kind") or getattr(self.instance, "kind", None)
+        if not invitation_kind:
+            invitation_kind = Invitation.Kind.INTERNAL_USER
+        attrs["kind"] = invitation_kind
         tenant = attrs.get("tenant")
         if tenant is None and self.instance is not None:
             tenant = self.instance.tenant
         request = self.context.get("request")
-        if tenant is None and request and getattr(request.user, "is_authenticated", False) and not request.user.is_superuser:
-            tenant = request.user.tenant
 
         email = attrs.get("email") or getattr(self.instance, "email", None)
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({"email": "Ja existe uma conta com este e-mail."})
         if tenant and email:
-            existing_user = User.objects.filter(tenant=tenant, email__iexact=email).exclude(pk=getattr(self.instance, "user_id", None)).first()
-            if existing_user:
-                raise serializers.ValidationError({"email": "Ja existe um usuario com este e-mail neste tenant."})
             duplicate_invite = Invitation.objects.filter(tenant=tenant, email__iexact=email).exclude(pk=getattr(self.instance, "pk", None))
-            active_statuses = [Invitation.Status.PENDING, Invitation.Status.SENT]
-            if duplicate_invite.filter(status__in=active_statuses).exists():
+            active_statuses = [Invitation.Status.PENDING]
+            if duplicate_invite.filter(status__in=active_statuses, kind=invitation_kind).exists():
                 raise serializers.ValidationError({"email": "Ja existe um convite ativo para este e-mail neste tenant."})
-            if self.instance is None and tenant.max_invitations is not None:
-                active_invites = tenant.invitations.filter(status__in=active_statuses).count()
-                if active_invites >= tenant.max_invitations:
-                    raise serializers.ValidationError({"tenant": f"Limite de convites ativos atingido para o tenant {tenant.name}."})
+        request_user = getattr(request, "user", None)
+        if invitation_kind == Invitation.Kind.PLATFORM_ADMIN:
+            if request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
+                requester_tenant_slug = getattr(getattr(request_user, "tenant", None), "slug", "")
+                if requester_tenant_slug != "admin":
+                    attrs["target_tenant_slug"] = "usuario"
+                    attrs["target_tenant_name"] = Tenant.objects.filter(slug="usuario").values_list("name", flat=True).first() or "usuario"
+                    target_tenant_slug = "usuario"
+                else:
+                    target_tenant_slug = slugify(attrs.get("target_tenant_slug") or getattr(self.instance, "target_tenant_slug", ""))
+            else:
+                target_tenant_slug = slugify(attrs.get("target_tenant_slug") or getattr(self.instance, "target_tenant_slug", ""))
+            if not target_tenant_slug:
+                raise serializers.ValidationError({"target_tenant_slug": "Selecione o tenant de destino do convite."})
+            target_tenant = Tenant.objects.filter(slug=target_tenant_slug).first()
+            if not target_tenant:
+                raise serializers.ValidationError({"target_tenant_slug": "Tenant de destino invalido."})
+            attrs["target_tenant_slug"] = target_tenant.slug
+            attrs["target_tenant_name"] = target_tenant.name
+        else:
+            if tenant and not tenant.can_send_invitations:
+                raise serializers.ValidationError({"tenant": "Este tenant nao possui direito a convites."})
+            attrs["target_tenant_name"] = ""
+            attrs["target_tenant_slug"] = ""
+
+        if request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
+            if invitation_kind == Invitation.Kind.PLATFORM_ADMIN:
+                limit = request_user.max_admin_invitations
+                if limit is not None:
+                    active_count = request_user.get_active_admin_invitation_count()
+                    if self.instance and getattr(self.instance, "status", None) == Invitation.Status.PENDING:
+                        active_count = max(active_count - 1, 0)
+                    if active_count >= limit:
+                        raise serializers.ValidationError({"email": "Este usuario atingiu o limite de convites administrativos."})
 
         return attrs
 
     def create(self, validated_data):
         request = self.context.get("request")
+        invitation_kind = validated_data.get("kind", self.get_invitation_kind())
         if request and getattr(request.user, "is_authenticated", False):
             validated_data["invited_by"] = request.user
-            if not request.user.is_superuser:
-                validated_data["tenant"] = request.user.tenant
-        if not validated_data.get("tenant"):
+        if invitation_kind != Invitation.Kind.PLATFORM_ADMIN and not validated_data.get("tenant"):
             raise serializers.ValidationError({"tenant": "Tenant obrigatorio para enviar convite."})
         validated_data.setdefault("full_name", "")
-        validated_data.setdefault("user_type", User.UserType.USER)
-        validated_data["status"] = Invitation.Status.SENT
+        validated_data.setdefault("phone", "")
+        validated_data.setdefault("message", "")
+        validated_data["status"] = Invitation.Status.PENDING
         validated_data.setdefault("expires_at", timezone.localdate() + timedelta(days=7))
         with transaction.atomic():
             invitation = super().create(validated_data)
@@ -350,12 +349,27 @@ class InvitationSerializer(serializers.ModelSerializer):
         return invitation
 
 
+class InvitationSerializer(BaseInvitationSerializer):
+    pass
+
+
+class AdminInvitationSerializer(BaseInvitationSerializer):
+    class Meta(BaseInvitationSerializer.Meta):
+        fields = BaseInvitationSerializer.Meta.fields
+
+
 class InvitationLookupSerializer(serializers.ModelSerializer):
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
+    status = serializers.SerializerMethodField()
+
+    def get_status(self, obj):
+        if obj.expires_at and obj.expires_at < timezone.localdate() and obj.status == Invitation.Status.PENDING:
+            return Invitation.Status.EXPIRED
+        return obj.status
 
     class Meta:
         model = Invitation
-        fields = ["email", "tenant_name", "status", "expires_at"]
+        fields = ["email", "tenant_name", "target_tenant_name", "status", "expires_at", "kind"]
 
 
 class InvitationAcceptSerializer(serializers.Serializer):
@@ -373,14 +387,13 @@ class InvitationAcceptSerializer(serializers.Serializer):
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError({"password_confirm": "As senhas nao conferem."})
 
-        if invitation.status not in {Invitation.Status.PENDING, Invitation.Status.SENT}:
+        if invitation.status != Invitation.Status.PENDING:
             raise serializers.ValidationError("Este convite nao esta mais disponivel.")
 
         if invitation.expires_at and invitation.expires_at < timezone.localdate():
+            invitation.status = Invitation.Status.EXPIRED
+            invitation.save(update_fields=["status", "updated_at"])
             raise serializers.ValidationError("Este convite expirou.")
-
-        if tenant.max_users is not None and tenant.users.filter(is_superuser=False).count() >= tenant.max_users:
-            raise serializers.ValidationError("O tenant atingiu o limite de usuarios.")
 
         if User.objects.filter(email__iexact=invitation.email).exists():
             raise serializers.ValidationError({"email": "Ja existe uma conta com este e-mail."})
@@ -393,23 +406,52 @@ class InvitationAcceptSerializer(serializers.Serializer):
     @transaction.atomic
     def save(self, **kwargs):
         invitation = self.context["invitation"]
+        root_user = invitation.invited_by.get_master_root() if invitation.invited_by_id else None
+        target_tenant = invitation.tenant
+        master_user = root_user
+        role = User.Role.STAFF
+
+        if invitation.kind == Invitation.Kind.PLATFORM_ADMIN:
+            target_tenant = Tenant.objects.get(slug=invitation.target_tenant_slug)
+            master_user = None
+            role = User.Role.OWNER
+        elif invitation.kind == Invitation.Kind.INTERNAL_USER:
+            if target_tenant and target_tenant.requires_master_user:
+                master_user = invitation.invited_by
+            else:
+                master_user = None
+            role = User.Role.STAFF
+
         user = User(
-            tenant=invitation.tenant,
+            tenant=target_tenant,
+            master_user=master_user,
             username=self.validated_data["username"].strip(),
             email=invitation.email,
             full_name=self.validated_data["full_name"].strip(),
             phone=self.validated_data.get("phone", "").strip(),
-            user_type=invitation.user_type,
+            role=role,
             access_status=User.AccessStatus.ACTIVE,
             allowed_modules=[],
+            is_staff=False,
         )
         user.set_password(self.validated_data["password"])
         user.save()
+        assigned_groups = list(invitation.assigned_groups.all())
+        assigned_subgroups = list(invitation.assigned_subgroups.all())
+        if assigned_groups:
+            user.assigned_groups.set(assigned_groups)
+            for group in assigned_groups:
+                group.users_with_access.add(user)
+        if assigned_subgroups:
+            user.assigned_subgroups.set(assigned_subgroups)
+            for subgroup in assigned_subgroups:
+                subgroup.users_with_access.add(user)
 
         invitation.full_name = user.full_name
         invitation.phone = user.phone
         invitation.status = Invitation.Status.ACCEPTED
-        invitation.save(update_fields=["full_name", "phone", "status", "updated_at"])
+        invitation.accepted_user = user
+        invitation.save(update_fields=["full_name", "phone", "status", "accepted_user", "updated_at"])
         return user
 
 

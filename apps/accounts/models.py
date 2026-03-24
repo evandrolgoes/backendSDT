@@ -11,17 +11,25 @@ from .managers import UserManager
 
 
 class Tenant(TimeStampedModel):
+    class AccountType(models.TextChoices):
+        SHARED_CLIENT = "shared_client", "Cliente compartilhado"
+        DISTRIBUTOR = "distributor", "Distribuidor"
+
     name = models.CharField(max_length=150)
     slug = models.SlugField(unique=True)
-    description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
-    plan_name = models.CharField(max_length=120, blank=True, null=True, default="")
-    subscription_status = models.CharField(max_length=30, blank=True, null=True, default="active")
-    expires_at = models.DateField(null=True, blank=True)
-    max_groups = models.PositiveIntegerField(null=True, blank=True)
-    max_subgroups = models.PositiveIntegerField(null=True, blank=True)
-    max_users = models.PositiveIntegerField(null=True, blank=True)
-    max_invitations = models.PositiveIntegerField(null=True, blank=True)
+    account_type = models.CharField(max_length=30, choices=AccountType.choices, default=AccountType.SHARED_CLIENT)
+    parent_distributor = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="managed_tenants",
+    )
+    requires_master_user = models.BooleanField(default=False)
+    can_send_invitations = models.BooleanField(default=True)
+    can_register_groups = models.BooleanField(default=True)
+    can_register_subgroups = models.BooleanField(default=True)
     enabled_modules = models.JSONField(default=default_enabled_modules, blank=True, null=True)
 
     class Meta:
@@ -35,6 +43,9 @@ class Tenant(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    def is_distributor(self):
+        return self.account_type == self.AccountType.DISTRIBUTOR
+
     def get_enabled_modules(self):
         configured = self.enabled_modules or []
         if not configured:
@@ -46,21 +57,26 @@ class Tenant(TimeStampedModel):
 
 
 class User(AbstractUser):
-    class UserType(models.TextChoices):
-        ADMIN = "admin", "Admin"
-        USER = "user", "Usuario"
-        USER_ADMIN = "user_admin", "Usuario-admin"
+    class Role(models.TextChoices):
+        OWNER = "owner", "Owner"
+        MANAGER = "manager", "Manager"
+        STAFF = "staff", "Staff"
+        VIEWER = "viewer", "Viewer"
 
     class AccessStatus(models.TextChoices):
         PENDING = "pending", "Pendente"
         ACTIVE = "active", "Ativo"
 
     tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.SET_NULL, related_name="users")
+    master_user = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="managed_users")
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30, blank=True)
-    user_type = models.CharField(max_length=20, choices=UserType.choices, default=UserType.USER)
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.STAFF)
     access_status = models.CharField(max_length=20, choices=AccessStatus.choices, default=AccessStatus.ACTIVE)
+    max_admin_invitations = models.PositiveIntegerField(null=True, blank=True)
+    max_owned_groups = models.PositiveIntegerField(null=True, blank=True)
+    max_owned_subgroups = models.PositiveIntegerField(null=True, blank=True)
     assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="assigned_users")
     assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="assigned_users")
     allowed_modules = models.JSONField(default=list, blank=True, null=True)
@@ -109,26 +125,92 @@ class User(AbstractUser):
     def is_tenant_admin(self):
         if self.is_superuser:
             return True
-        return self.user_type in {self.UserType.ADMIN, self.UserType.USER_ADMIN}
+        return self.role in {self.Role.OWNER, self.Role.MANAGER}
+
+    def is_distributor_admin(self):
+        if self.is_superuser:
+            return True
+        return bool(self.tenant_id and self.tenant.is_distributor() and self.role in {self.Role.OWNER, self.Role.MANAGER})
+
+    def is_client_admin(self):
+        if self.is_superuser:
+            return True
+        return bool(self.tenant_id and not self.tenant.is_distributor() and self.role in {self.Role.OWNER, self.Role.MANAGER})
+
+    def is_client_owner(self):
+        if self.is_superuser:
+            return True
+        return bool(self.tenant_id and not self.tenant.is_distributor() and self.role == self.Role.OWNER)
+
+    def is_distributor_owner(self):
+        if self.is_superuser:
+            return True
+        return bool(self.tenant_id and self.tenant.is_distributor() and self.role == self.Role.OWNER)
+
+    def has_tenant_slug(self, *slugs):
+        if self.is_superuser:
+            return True
+        return bool(self.tenant_id and self.tenant.slug in set(slugs))
+
+    def get_accessible_tenant_ids(self):
+        if self.is_superuser:
+            return list(Tenant.objects.values_list("id", flat=True))
+        if not self.tenant_id:
+            return []
+        if self.has_tenant_slug("admin"):
+            return list(Tenant.objects.values_list("id", flat=True))
+        if self.has_tenant_slug("usuario") and self.master_user_id and self.master_user.tenant_id:
+            return [self.master_user.tenant_id]
+        return [self.tenant_id]
+
+    def get_master_root(self):
+        return self.master_user or self
+
+    def get_master_cohort(self):
+        root = self.get_master_root()
+        return User.objects.filter(models.Q(id=root.id) | models.Q(master_user=root))
+
+    def get_internal_team_cohort(self):
+        root = self.get_master_root()
+        return User.objects.filter(models.Q(id=root.id) | models.Q(master_user=root)).exclude(tenant__slug="usuario")
+
+    def get_active_admin_invitation_count(self):
+        return self.sent_invitations.filter(status=Invitation.Status.PENDING).count()
+
+    def get_owned_groups_count(self):
+        return self.owned_groups.count()
+
+    def get_owned_subgroups_count(self):
+        return self.owned_subgroups.count()
 
 
 class Invitation(TimeStampedModel):
+    class Kind(models.TextChoices):
+        INTERNAL_USER = "internal_user", "Convite interno"
+        FARM_OWNER = "farm_owner", "Owner da fazenda"
+        DISTRIBUTOR = "distributor", "Distribuidor"
+        PLATFORM_ADMIN = "platform_admin", "Usuario admin"
+
     class Status(models.TextChoices):
         PENDING = "pending", "Pendente"
-        SENT = "sent", "Enviado"
-        ACCEPTED = "accepted", "Aceito"
-        CANCELLED = "cancelled", "Cancelado"
+        ACCEPTED = "accepted", "Cadastro realizado"
+        EXPIRED = "expired", "Expirado"
 
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="invitations")
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.CASCADE, related_name="invitations")
+    kind = models.CharField(max_length=30, choices=Kind.choices, default=Kind.INTERNAL_USER)
     token = models.CharField(max_length=64, unique=True, blank=True)
+    target_tenant_name = models.CharField(max_length=150, blank=True)
+    target_tenant_slug = models.SlugField(blank=True)
     full_name = models.CharField(max_length=150, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=30, blank=True)
-    user_type = models.CharField(max_length=20, choices=User.UserType.choices, default=User.UserType.USER)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SENT)
+    assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="invitations")
+    assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="invitations")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     message = models.TextField(blank=True)
     expires_at = models.DateField(null=True, blank=True)
     invited_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="sent_invitations")
+    accepted_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="accepted_invitations")
 
     class Meta:
         ordering = ["-created_at"]

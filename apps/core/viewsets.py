@@ -117,7 +117,8 @@ class TenantScopedModelViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return queryset
         if hasattr(queryset.model, self.tenant_field):
-            queryset = queryset.filter(**{self.tenant_field: user.tenant})
+            accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
+            queryset = queryset.filter(**{f"{self.tenant_field}_id__in": accessible_tenant_ids})
         return self._filter_queryset_by_assignments(queryset, user)
 
     def _available_relation_fields(self, model, candidates, related_model_label):
@@ -147,6 +148,9 @@ class TenantScopedModelViewSet(viewsets.ModelViewSet):
         return queries
 
     def _filter_queryset_by_assignments(self, queryset, user):
+        if getattr(user, "is_distributor_admin", lambda: False)() or getattr(user, "has_tenant_slug", lambda *args: False)("admin"):
+            return queryset
+
         model = queryset.model
         allowed_group_ids = list(user.assigned_groups.values_list("id", flat=True))
         allowed_subgroup_ids = list(user.assigned_subgroups.values_list("id", flat=True))

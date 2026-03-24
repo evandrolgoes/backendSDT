@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import (
     AccessRequestView,
+    AdminInvitationViewSet,
     ForgotPasswordView,
     InvitationAcceptView,
     InvitationDetailByTokenView,
@@ -30,6 +31,7 @@ from apps.derivatives.views import (
     inspect_bubble_import,
 )
 from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
+from apps.mercado.views import MarketNewsPostViewSet, mercado_health
 from apps.leads.views import LeadCreateView
 from apps.physical.views import (
     ActualCostViewSet,
@@ -41,11 +43,13 @@ from apps.physical.views import (
 )
 from apps.risk.views import ExposurePositionViewSet
 from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
+from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
 
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
 router.register("users", UserViewSet, basename="user")
 router.register("invitations", InvitationViewSet, basename="invitation")
+router.register("admin-invitations", AdminInvitationViewSet, basename="admin-invitation")
 router.register("clients", ClientAccountViewSet, basename="client")
 router.register("groups", EconomicGroupViewSet, basename="group")
 router.register("subgroups", SubGroupViewSet, basename="subgroup")
@@ -77,11 +81,14 @@ router.register("basis-series", BasisSeriesViewSet, basename="basis-series")
 router.register("exposure-positions", ExposurePositionViewSet, basename="exposure-position")
 router.register("audit-logs", AuditLogViewSet, basename="audit-log")
 router.register("attachments", AttachmentViewSet, basename="attachment")
+router.register("tradingview-watchlist-quotes", TradingViewWatchlistQuoteViewSet, basename="tradingview-watchlist-quote")
+router.register("market-news-posts", MarketNewsPostViewSet, basename="market-news-post")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
     path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
+    path("api/mercado/health/", mercado_health, name="mercado_health"),
     path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
     path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),
     path("api/import-tools/bubble/derivatives/", import_bubble_derivatives, name="import_bubble_derivatives"),
