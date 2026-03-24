@@ -1,9 +1,29 @@
+import json
+
 from rest_framework import serializers
 
 from .models import MarketNewsPost
 
 
+class CategoryListField(serializers.ListField):
+    child = serializers.CharField()
+
+    def to_internal_value(self, data):
+        if isinstance(data, str):
+            raw = data.strip()
+            if not raw:
+                data = []
+            else:
+                try:
+                    parsed = json.loads(raw)
+                    data = parsed if isinstance(parsed, list) else [parsed]
+                except json.JSONDecodeError:
+                    data = [item.strip() for item in raw.split(",") if item.strip()]
+        return super().to_internal_value(data)
+
+
 class MarketNewsPostSerializer(serializers.ModelSerializer):
+    categorias = CategoryListField(required=False)
     published_by_name = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     remove_audio = serializers.BooleanField(write_only=True, required=False, default=False)
