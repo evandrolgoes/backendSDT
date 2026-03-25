@@ -28,8 +28,11 @@ def _should_start_scheduler():
     if command in blocked_commands:
         return False
 
-    if command == "runserver" and os.environ.get("RUN_MAIN") != "true":
-        return False
+    if command == "runserver":
+        # With the default Django autoreloader, only the child process should start the job.
+        # When runserver is started with --noreload, RUN_MAIN is not set, so allow it.
+        if "--noreload" not in sys.argv and os.environ.get("RUN_MAIN") != "true":
+            return False
 
     return True
 
