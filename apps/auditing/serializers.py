@@ -1,20 +1,28 @@
 from rest_framework import serializers
+from django.utils import timezone
 
 from .models import Attachment, AuditLog
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
     usuario = serializers.SerializerMethodField()
+    created_at_display = serializers.SerializerMethodField()
 
     def get_usuario(self, obj):
         if not obj.user:
             return ""
         return obj.user.full_name or obj.user.username
 
+    def get_created_at_display(self, obj):
+        if not obj.created_at:
+            return ""
+        localized = timezone.localtime(obj.created_at)
+        return localized.strftime("%d/%m/%Y %H:%M")
+
     class Meta:
         model = AuditLog
         fields = "__all__"
-        read_only_fields = ["created_at", "usuario"]
+        read_only_fields = ["created_at", "created_at_display", "usuario"]
 
 
 class AttachmentSerializer(serializers.ModelSerializer):

@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.views import TenantViewSet, UserViewSet
+from apps.auditing.context import suppress_audit_signals
 from apps.catalog.views import (
     CropViewSet,
     CurrencyViewSet,
@@ -68,6 +69,47 @@ for resource_name, config in RESOURCE_REGISTRY.items():
 
 EXCLUDED_UPDATE_FIELDS = {"id", "tenant", "created_at", "updated_at", "created_by", "attachments", "password"}
 EXCLUDED_FILTER_FIELDS = {"id", "created_at", "updated_at", "created_by", "attachments", "password"}
+EXCLUDED_IMPORT_FIELDS = {"id", "tenant", "created_at", "updated_at", "created_by", "attachments", "password"}
+
+MASS_IMPORT_FIELD_OVERRIDES = {
+    "derivative-operations": {
+        "bolsa_ref": {"type": "select", "resource": "exchanges", "labelKey": "nome", "valueKey": "nome"},
+        "status_operacao": {
+            "type": "select",
+            "options": [
+                {"value": "Em aberto", "label": "Em aberto"},
+                {"value": "Encerrado", "label": "Encerrado"},
+            ],
+        },
+        "contrato_derivativo": {"type": "contract"},
+        "moeda_ou_cmdtye": {
+            "type": "select",
+            "options": [
+                {"value": "Moeda", "label": "Moeda"},
+                {"value": "Cmdtye", "label": "Cmdtye"},
+            ],
+        },
+        "strike_moeda_unidade": {"type": "select", "resource": "price-units", "labelKey": "nome", "valueKey": "nome"},
+        "nome_da_operacao": {"type": "select", "resource": "derivative-operation-names", "labelKey": "nome", "valueKey": "nome"},
+        "posicao": {
+            "type": "select",
+            "options": [
+                {"value": "Compra", "label": "Compra"},
+                {"value": "Venda", "label": "Venda"},
+            ],
+        },
+        "tipo_derivativo": {
+            "type": "select",
+            "options": [
+                {"value": "Call", "label": "Call"},
+                {"value": "Put", "label": "Put"},
+                {"value": "NDF", "label": "NDF"},
+            ],
+        },
+        "volume_financeiro_moeda": {"type": "select", "resource": "currencies", "labelKey": "nome", "valueKey": "nome"},
+        "volume_fisico_unidade": {"type": "select", "resource": "units", "labelKey": "nome", "valueKey": "nome"},
+    }
+}
 
 
 def _ensure_tool_access(request):
@@ -280,6 +322,55 @@ def _build_resource_metadata(resource, config, request):
     }
 
 
+def _build_mass_import_metadata(resource, config, request):
+    serializer = _get_serializer(config["viewset"], request)
+    fields = []
+    overrides = MASS_IMPORT_FIELD_OVERRIDES.get(resource, {})
+
+    for field_name, serializer_field in serializer.fields.items():
+        if isinstance(serializer_field, serializers.HiddenField):
+            continue
+        if serializer_field.read_only or serializer_field.write_only:
+            continue
+        if field_name in EXCLUDED_IMPORT_FIELDS:
+            continue
+
+        meta = _resolve_field_meta(field_name, serializer_field)
+        override = overrides.get(field_name, {})
+        merged = {
+            "name": field_name,
+            "label": meta["label"],
+            "type": meta["type"],
+            "required": False,
+            "resource": meta.get("relatedResource"),
+            "options": meta.get("options"),
+            "labelKey": None,
+            "valueKey": None,
+        }
+
+        if meta["type"] == "relation":
+            related_resource = meta.get("relatedResource")
+            if related_resource == "groups":
+                merged["labelKey"] = "grupo"
+            elif related_resource == "subgroups":
+                merged["labelKey"] = "subgrupo"
+            elif related_resource == "crops":
+                merged["labelKey"] = "ativo"
+            elif related_resource == "seasons":
+                merged["labelKey"] = "safra"
+            elif related_resource == "counterparties":
+                merged["labelKey"] = "obs"
+
+        merged.update(override)
+        fields.append(merged)
+
+    return {
+        "resource": resource,
+        "label": config["label"],
+        "fields": fields,
+    }
+
+
 def _get_filtered_queryset(request, resource, filters, search_term, updates):
     config = _get_resource_config(request, resource)
     queryset = _get_base_queryset(config["viewset"], request)
@@ -315,6 +406,85 @@ class MassUpdateResourcesView(APIView):
             if _user_has_access(request.user, config)
         ]
         return Response({"resources": resources})
+
+
+class MassImportResourcesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        _ensure_tool_access(request)
+        resources = [
+            {"value": resource, "label": config["label"], "module": config.get("module")}
+            for resource, config in RESOURCE_REGISTRY.items()
+            if _user_has_access(request.user, config)
+        ]
+        return Response({"resources": resources})
+
+
+class MassImportMetadataView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        _ensure_tool_access(request)
+        resource = request.query_params.get("resource")
+        config = _get_resource_config(request, resource)
+        return Response(_build_mass_import_metadata(resource, config, request))
+
+
+class MassImportApplyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        _ensure_tool_access(request)
+        resource = request.data.get("resource")
+        rows = request.data.get("rows") or []
+
+        if not isinstance(rows, list) or not rows:
+            raise serializers.ValidationError({"rows": "Informe pelo menos uma linha para importar."})
+
+        config = _get_resource_config(request, resource)
+        helper = _get_audit_helper(request)
+        serializer_class = config["viewset"].serializer_class
+        model = serializer_class.Meta.model
+        created = []
+        row_errors = {}
+
+        with transaction.atomic():
+            for index, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    row_errors[str(index + 1)] = {"detail": "Linha invalida."}
+                    continue
+
+                payload = {key: value for key, value in row.items() if value not in ("", None, [], {})}
+                serializer = _get_serializer(config["viewset"], request, data=payload)
+                if not serializer.is_valid():
+                    row_errors[str(index + 1)] = serializer.errors
+                    continue
+
+                extra = {}
+                if hasattr(model, "tenant"):
+                    if not request.user.tenant_id:
+                        raise serializers.ValidationError({"tenant": "O usuario autenticado nao possui tenant vinculado."})
+                    extra["tenant"] = request.user.tenant
+                if hasattr(model, "created_by"):
+                    extra["created_by"] = request.user
+
+                with suppress_audit_signals():
+                    instance = serializer.save(**extra)
+                helper._create_audit_log("criado", instance, before={}, after=helper._serialize_instance_for_log(instance))
+                created.append(instance.pk)
+
+            if row_errors:
+                raise serializers.ValidationError({"rows": row_errors, "detail": "Existem linhas invalidas na importacao."})
+
+        return Response(
+            {
+                "resource": resource,
+                "label": config["label"],
+                "createdCount": len(created),
+                "createdIds": created[:20],
+            }
+        )
 
 
 class MassUpdateMetadataView(APIView):
@@ -375,7 +545,8 @@ class MassUpdateApplyView(APIView):
                 before = helper._serialize_instance_for_log(instance)
                 serializer = _get_serializer(config["viewset"], request, instance, data=payload, partial=True)
                 serializer.is_valid(raise_exception=True)
-                updated_instance = serializer.save()
+                with suppress_audit_signals():
+                    updated_instance = serializer.save()
                 helper._create_audit_log(
                     "alterado",
                     updated_instance,

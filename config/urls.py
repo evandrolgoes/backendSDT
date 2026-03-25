@@ -32,7 +32,15 @@ from apps.derivatives.views import (
     inspect_bubble_import,
 )
 from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
-from apps.mass_update.views import MassUpdateApplyView, MassUpdateMetadataView, MassUpdatePreviewView, MassUpdateResourcesView
+from apps.mass_update.views import (
+    MassImportApplyView,
+    MassImportMetadataView,
+    MassImportResourcesView,
+    MassUpdateApplyView,
+    MassUpdateMetadataView,
+    MassUpdatePreviewView,
+    MassUpdateResourcesView,
+)
 from apps.mercado.views import MarketNewsPostViewSet, mercado_health
 from apps.leads.views import LeadCreateView
 from apps.physical.views import (
@@ -99,6 +107,9 @@ urlpatterns = [
     path("api/mass-update/metadata/", MassUpdateMetadataView.as_view(), name="mass_update_metadata"),
     path("api/mass-update/preview/", MassUpdatePreviewView.as_view(), name="mass_update_preview"),
     path("api/mass-update/apply/", MassUpdateApplyView.as_view(), name="mass_update_apply"),
+    path("api/mass-import/resources/", MassImportResourcesView.as_view(), name="mass_import_resources"),
+    path("api/mass-import/metadata/", MassImportMetadataView.as_view(), name="mass_import_metadata"),
+    path("api/mass-import/apply/", MassImportApplyView.as_view(), name="mass_import_apply"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/auth/login/", LoginView.as_view(), name="login"),

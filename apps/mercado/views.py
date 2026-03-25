@@ -5,6 +5,7 @@ from rest_framework import parsers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.auditing.context import suppress_audit_signals
 from apps.auditing.models import Attachment
 from apps.auditing.serializers import AttachmentSerializer
 from apps.core.viewsets import TenantScopedModelViewSet
@@ -49,12 +50,14 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
         return save_kwargs
 
     def perform_create(self, serializer):
-        instance = serializer.save(**self._build_save_kwargs(serializer))
+        with suppress_audit_signals():
+            instance = serializer.save(**self._build_save_kwargs(serializer))
         self._create_audit_log("criado", instance, before={}, after=self._serialize_instance_for_log(instance))
 
     def perform_update(self, serializer):
         before = self._serialize_instance_for_log(serializer.instance)
-        instance = serializer.save(**self._build_save_kwargs(serializer))
+        with suppress_audit_signals():
+            instance = serializer.save(**self._build_save_kwargs(serializer))
         self._create_audit_log("alterado", instance, before=before, after=self._serialize_instance_for_log(instance))
 
     @action(detail=True, methods=["get", "post"], parser_classes=[parsers.MultiPartParser, parsers.FormParser])

@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db import models, transaction
+from django.db import models
 from django.db.models import Q
 from django.http import JsonResponse
 from django.utils.dateparse import parse_date, parse_datetime
@@ -16,6 +16,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.auditing.context import suppress_audit_signals
 from apps.auditing.models import Attachment
 from apps.auditing.serializers import AttachmentSerializer
 from apps.catalog.models import Crop, Currency, DerivativeOperationName, Exchange, PriceUnit, Unit
@@ -880,68 +881,6 @@ class DerivativeOperationViewSet(TenantScopedModelViewSet):
         ]
         return Response(AttachmentSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["get"], url_path="bulk-import-metadata")
-    def bulk_import_metadata(self, request):
-        return Response({"fields": _get_derivative_bulk_fields()})
-
-    @action(detail=False, methods=["post"], url_path="bulk-import")
-    def bulk_import(self, request):
-        rows = request.data.get("rows")
-        if not isinstance(rows, list) or not rows:
-            return Response({"detail": "Envie ao menos uma linha para importar."}, status=status.HTTP_400_BAD_REQUEST)
-
-        prepared_rows = []
-        row_errors = {}
-
-        for index, row in enumerate(rows):
-            row_number = index + 1
-            if not isinstance(row, dict):
-                row_errors[str(row_number)] = {"detail": "Linha invalida."}
-                continue
-
-            cleaned_row = {key: value for key, value in row.items() if value not in (None, [], {})}
-            prepared_rows.append((row_number, cleaned_row))
-
-        if row_errors:
-            return Response(
-                {"detail": "Existem linhas invalidas na importacao.", "rows": row_errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializers_to_create = []
-        for row_number, payload in prepared_rows:
-            serializer = self.get_serializer(data=payload)
-            if not serializer.is_valid():
-                row_errors[str(row_number)] = serializer.errors
-                continue
-            serializers_to_create.append((row_number, serializer))
-
-        if row_errors:
-            return Response(
-                {"detail": "Existem linhas invalidas na importacao.", "rows": row_errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if getattr(self.request.user, "tenant_id", None) is None:
-            return Response(
-                {"detail": "O usuario autenticado nao possui tenant vinculado."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        created_instances = []
-        with transaction.atomic():
-            for _row_number, serializer in serializers_to_create:
-                extra = {}
-                if hasattr(serializer.Meta.model, "tenant"):
-                    extra["tenant"] = self.request.user.tenant
-                if hasattr(serializer.Meta.model, "created_by"):
-                    extra["created_by"] = self.request.user
-                instance = serializer.save(**extra)
-                created_instances.append(instance)
-                self._create_audit_log("criado", instance, before={}, after=self._serialize_instance_for_log(instance))
-
-        return Response(self.get_serializer(created_instances, many=True).data, status=status.HTTP_201_CREATED)
-
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -1059,6 +998,8 @@ def import_bubble_derivatives(request):
     created_count = 0
     skipped_count = 0
     warnings = []
+    audit_helper = TenantScopedModelViewSet()
+    audit_helper.request = request
 
     for index, row in enumerate(rows, start=1):
         if not isinstance(row, dict):
@@ -1103,9 +1044,12 @@ def import_bubble_derivatives(request):
         if model is DerivativeOperation and not instance.cod_operacao_mae:
             instance.cod_operacao_mae = import_key
 
-        instance.save()
-        for field_name, values in m2m_updates.items():
-            getattr(instance, field_name).set(values)
+        with suppress_audit_signals():
+            instance.save()
+            for field_name, values in m2m_updates.items():
+                getattr(instance, field_name).set(values)
+
+        audit_helper._create_audit_log("criado", instance, before={}, after=audit_helper._serialize_instance_for_log(instance))
 
         created_count += 1
 
