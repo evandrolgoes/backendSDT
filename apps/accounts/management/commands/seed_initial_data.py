@@ -18,8 +18,8 @@ class Command(BaseCommand):
         for code, name in [("admin", "Administrador"), ("risk_manager", "Gestor de Risco"), ("trader", "Trader"), ("viewer", "Leitor")]:
             Role.objects.get_or_create(code=code, defaults={"name": name})
 
-        for cultura in ["Soja", "Milho", "Algodao", "Cafe"]:
-            Crop.objects.get_or_create(cultura=cultura)
+        for ativo in ["Soja", "Milho", "Algodao", "Cafe"]:
+            Crop.objects.get_or_create(ativo=ativo)
 
         for name in ["B3", "CME", "Reuters", "Manual"]:
             PriceSource.objects.get_or_create(name=name)
@@ -49,8 +49,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Initial data seeded successfully."))
             return
 
-        soja = Crop.objects.get(cultura="Soja")
-        milho = Crop.objects.get(cultura="Milho")
+        soja = Crop.objects.get(ativo="Soja")
+        milho = Crop.objects.get(ativo="Milho")
 
         grupo_alpha, _ = EconomicGroup.objects.get_or_create(tenant_id=tenant, grupo="Grupo Alpha")
         grupo_sertao, _ = EconomicGroup.objects.get_or_create(tenant_id=tenant, grupo="Grupo Sertao")
@@ -172,7 +172,7 @@ class Command(BaseCommand):
                 "created_by": owner,
                 "grupo": grupo_alpha,
                 "subgrupo": subgrupo_norte,
-                "cultura": soja,
+                "ativo": soja,
                 "safra": safra_2425,
                 "bolsa_ref": "CME",
                 "status_operacao": "Em aberto",
@@ -182,16 +182,17 @@ class Command(BaseCommand):
                 "contrato_derivativo": "PUT SOJA CME JUL26",
                 "dolar_ptax_vencimento": 5.75,
                 "moeda_ou_cmdtye": "Cmdtye",
-                "moeda_unidade": "U$/bus",
+                "strike_moeda_unidade": "U$/bus",
                 "nome_da_operacao": "Compra Put",
-                "unidade": "bus",
-                "grupo_montagem": "Compra",
+                "posicao": "Compra",
                 "tipo_derivativo": "Put",
                 "custo_total_montagem_brl": 18250.0,
                 "ajustes_totais_usd": 15200.0,
                 "volume_financeiro_moeda": "U$",
-                "volume_financeiro_valor_moeda_original": 52000.0,
-                "volume_fisico": 18000.0,
+                "volume_financeiro_valor": 52000.0,
+                "volume_fisico_unidade": "bus",
+                "volume_fisico_valor": 18000.0,
+                "obs": "Protecao inicial da operacao",
             },
         )
 
@@ -203,7 +204,7 @@ class Command(BaseCommand):
                 "created_by": owner,
                 "grupo": grupo_sertao,
                 "subgrupo": subgrupo_leste,
-                "cultura": milho,
+                "ativo": milho,
                 "safra": safra_2526,
                 "bolsa_ref": "B3",
                 "status_operacao": "Em aberto",
@@ -213,16 +214,17 @@ class Command(BaseCommand):
                 "contrato_derivativo": "NDF USD JUL26",
                 "dolar_ptax_vencimento": 5.68,
                 "moeda_ou_cmdtye": "Moeda",
-                "moeda_unidade": "R$/@",
+                "strike_moeda_unidade": "R$/@",
                 "nome_da_operacao": "Venda NDF",
-                "unidade": "@",
-                "grupo_montagem": "Venda",
+                "posicao": "Venda",
                 "tipo_derivativo": "NDF",
                 "custo_total_montagem_brl": 9800.0,
                 "ajustes_totais_usd": 8300.0,
                 "volume_financeiro_moeda": "U$",
-                "volume_financeiro_valor_moeda_original": 43000.0,
-                "volume_fisico": 9500.0,
+                "volume_financeiro_valor": 43000.0,
+                "volume_fisico_unidade": "@",
+                "volume_fisico_valor": 9500.0,
+                "obs": "Estrutura principal de hedge cambial",
             },
         )
         DerivativeOperation.objects.get_or_create(
@@ -233,7 +235,7 @@ class Command(BaseCommand):
                 "created_by": owner,
                 "grupo": grupo_sertao,
                 "subgrupo": subgrupo_leste,
-                "cultura": milho,
+                "ativo": milho,
                 "safra": safra_2526,
                 "bolsa_ref": "B3",
                 "status_operacao": "Em aberto",
@@ -243,16 +245,17 @@ class Command(BaseCommand):
                 "contrato_derivativo": "NDF USD JUL26",
                 "dolar_ptax_vencimento": 5.68,
                 "moeda_ou_cmdtye": "Moeda",
-                "moeda_unidade": "R$/@",
+                "strike_moeda_unidade": "R$/@",
                 "nome_da_operacao": "Venda NDF",
-                "unidade": "@",
-                "grupo_montagem": "Compra",
+                "posicao": "Compra",
                 "tipo_derivativo": "Call",
                 "custo_total_montagem_brl": 6200.0,
                 "ajustes_totais_usd": 4100.0,
                 "volume_financeiro_moeda": "U$",
-                "volume_financeiro_valor_moeda_original": 43000.0,
-                "volume_fisico": 5000.0,
+                "volume_financeiro_valor": 43000.0,
+                "volume_fisico_unidade": "@",
+                "volume_fisico_valor": 5000.0,
+                "obs": "Segunda perna complementar da estrutura",
             },
         )
 

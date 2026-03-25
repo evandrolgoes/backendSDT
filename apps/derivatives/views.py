@@ -1,11 +1,13 @@
 import json
+import re
 from decimal import Decimal, InvalidOperation
 from urllib.error import URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db import models, transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.utils.dateparse import parse_date, parse_datetime
@@ -16,50 +18,21 @@ from rest_framework.response import Response
 
 from apps.auditing.models import Attachment
 from apps.auditing.serializers import AttachmentSerializer
-from apps.catalog.models import Crop
-from apps.clients.models import Counterparty, CropSeason, EconomicGroup, SubGroup
+from apps.catalog.models import Crop, Currency, DerivativeOperationName, Exchange, PriceUnit, Unit
+from apps.clients.models import Broker, Counterparty, CropSeason, EconomicGroup, SubGroup
 from apps.core.viewsets import TenantScopedModelViewSet
+from apps.physical.models import ActualCost, BudgetCost, CashPayment, PhysicalPayment, PhysicalQuote, PhysicalSale
+from apps.strategies.models import CropBoard, HedgePolicy, Strategy, StrategyTrigger
 
 from .models import DerivativeOperation
 from .serializers import DerivativeOperationSerializer
 
 
-TARGET_FIELD_OPTIONS = [
-    {"value": "ignore", "label": "Ignorar"},
-    {"value": "cod_operacao_mae", "label": "Cod. operacao mae"},
-    {"value": "grupo", "label": "Grupo"},
-    {"value": "subgrupo", "label": "Subgrupo"},
-    {"value": "cultura", "label": "Cultura"},
-    {"value": "destino_cultura", "label": "Cultura destino"},
-    {"value": "safra", "label": "Safra"},
-    {"value": "bolsa_ref", "label": "Bolsa ref"},
-    {"value": "status_operacao", "label": "Status"},
-    {"value": "contraparte", "label": "Contraparte"},
-    {"value": "data_contratacao", "label": "Data contratacao"},
-    {"value": "data_liquidacao", "label": "Data liquidacao"},
-    {"value": "contrato_derivativo", "label": "Contrato derivativo"},
-    {"value": "dolar_ptax_vencimento", "label": "PTAX"},
-    {"value": "moeda_ou_cmdtye", "label": "Moeda ou cmdtye"},
-    {"value": "moeda_unidade", "label": "Moeda/unidade"},
-    {"value": "nome_da_operacao", "label": "Nome da operacao"},
-    {"value": "unidade", "label": "Unidade"},
-    {"value": "tipo_derivativo", "label": "Tipo derivativo"},
-    {"value": "numero_lotes", "label": "Numero de lotes"},
-    {"value": "strike_montagem", "label": "Strike montagem"},
-    {"value": "custo_total_montagem_brl", "label": "Custo total montagem"},
-    {"value": "strike_liquidacao", "label": "Strike liquidacao"},
-    {"value": "ajustes_totais_brl", "label": "Ajustes totais BRL"},
-    {"value": "ajustes_totais_usd", "label": "Ajustes totais moeda original"},
-    {"value": "volume_financeiro_moeda", "label": "Volume financeiro moeda"},
-    {"value": "volume_financeiro_valor_moeda_original", "label": "Volume financeiro valor moeda original"},
-    {"value": "volume", "label": "Volume"},
-]
-
 SOURCE_FIELD_ALIASES = {
     "cod_operacao_mae": ["codoperacaomae", "_id", "id"],
     "grupo": ["grupo"],
     "subgrupo": ["subgrupo"],
-    "cultura": ["culturaproduto"],
+    "ativo": ["ativo", "culturaproduto", "cultura"],
     "destino_cultura": ["seformoedadestinodamoeda"],
     "safra": ["safra"],
     "bolsa_ref": ["bolsaref"],
@@ -70,9 +43,9 @@ SOURCE_FIELD_ALIASES = {
     "contrato_derivativo": ["contratoderivativo"],
     "dolar_ptax_vencimento": ["liquidacaodolarptax"],
     "moeda_ou_cmdtye": ["moedacmdtye"],
-    "moeda_unidade": ["moedaunidade"],
+    "strike_moeda_unidade": ["strikemoedaunidade", "moedaunidade"],
     "nome_da_operacao": ["nomedaoperacao"],
-    "unidade": ["unidade"],
+    "posicao": ["posicao", "grupomontagem"],
     "tipo_derivativo": ["tipoddoerivativo", "tipoderivativo"],
     "numero_lotes": ["numerodecontratoslotes"],
     "strike_montagem": ["strikemontagem"],
@@ -81,8 +54,166 @@ SOURCE_FIELD_ALIASES = {
     "ajustes_totais_brl": ["liquidacaoajustetotalr"],
     "ajustes_totais_usd": ["liquidacaoajustetotalmoedaoriginal"],
     "volume_financeiro_moeda": ["volumefinanceiromoeda"],
-    "volume_financeiro_valor_moeda_original": ["volumefinanceirovalormoedaoriginal"],
-    "volume": ["volumefisico"],
+    "volume_financeiro_valor": ["volumefinanceirovalor", "volumefinanceirovalormoedaoriginal"],
+    "volume_fisico_unidade": ["volumefisicounidade", "unidade"],
+    "volume_fisico_valor": ["volumefisico", "volume"],
+    "obs": ["obs", "observacao", "observacoes", "observation"],
+}
+
+IMPORT_TARGETS = {
+    "derivatives": {
+        "label": "Derivativos",
+        "model": DerivativeOperation,
+        "lookup_fields": ["cod_operacao_mae"],
+    },
+    "physical_quotes": {
+        "label": "Cotacoes Fisico",
+        "model": PhysicalQuote,
+        "lookup_fields": [],
+    },
+    "budget_costs": {
+        "label": "Custo Orcamento",
+        "model": BudgetCost,
+        "lookup_fields": [],
+    },
+    "actual_costs": {
+        "label": "Custo Realizado",
+        "model": ActualCost,
+        "lookup_fields": [],
+    },
+    "physical_sales": {
+        "label": "Vendas Fisico",
+        "model": PhysicalSale,
+        "lookup_fields": [],
+    },
+    "physical_payments": {
+        "label": "Pgtos Fisico",
+        "model": PhysicalPayment,
+        "lookup_fields": [],
+    },
+    "cash_payments": {
+        "label": "Pgtos Caixa",
+        "model": CashPayment,
+        "lookup_fields": [],
+    },
+    "strategies": {
+        "label": "Estrategias",
+        "model": Strategy,
+        "lookup_fields": [],
+    },
+    "strategy_triggers": {
+        "label": "Gatilhos",
+        "model": StrategyTrigger,
+        "lookup_fields": [],
+    },
+    "hedge_policies": {
+        "label": "Politica de Hedge",
+        "model": HedgePolicy,
+        "lookup_fields": [],
+    },
+    "crop_boards": {
+        "label": "Quadro Safra",
+        "model": CropBoard,
+        "lookup_fields": [],
+    },
+    "groups": {
+        "label": "Grupo",
+        "model": EconomicGroup,
+        "lookup_fields": ["grupo"],
+    },
+    "subgroups": {
+        "label": "Subgrupo",
+        "model": SubGroup,
+        "lookup_fields": ["subgrupo"],
+    },
+    "seasons": {
+        "label": "Safra",
+        "model": CropSeason,
+        "lookup_fields": ["safra"],
+    },
+    "counterparties": {
+        "label": "Contrapartes",
+        "model": Counterparty,
+        "lookup_fields": [],
+    },
+    "brokers": {
+        "label": "Brokers",
+        "model": Broker,
+        "lookup_fields": ["name"],
+    },
+    "crops": {
+        "label": "Ativo",
+        "model": Crop,
+        "lookup_fields": ["ativo"],
+    },
+    "currencies": {
+        "label": "Moeda",
+        "model": Currency,
+        "lookup_fields": ["nome"],
+    },
+    "units": {
+        "label": "Unidade",
+        "model": Unit,
+        "lookup_fields": ["nome"],
+    },
+    "price_units": {
+        "label": "Moeda/Unidade",
+        "model": PriceUnit,
+        "lookup_fields": ["nome"],
+    },
+    "exchanges": {
+        "label": "Bolsa",
+        "model": Exchange,
+        "lookup_fields": ["nome"],
+    },
+    "derivative_operation_names": {
+        "label": "Nome Operacoes Derivativos",
+        "model": DerivativeOperationName,
+        "lookup_fields": ["nome"],
+    },
+}
+
+DERIVATIVE_BULK_SELECT_CONFIG = {
+    "bolsa_ref": {"type": "select", "resource": "exchanges", "label_key": "nome", "value_key": "nome"},
+    "status_operacao": {
+        "type": "select",
+        "options": [
+            {"value": "Em aberto", "label": "Em aberto"},
+            {"value": "Encerrado", "label": "Encerrado"},
+        ],
+    },
+    "contrato_derivativo": {"type": "contract"},
+    "moeda_ou_cmdtye": {
+        "type": "select",
+        "options": [
+            {"value": "Moeda", "label": "Moeda"},
+            {"value": "Cmdtye", "label": "Cmdtye"},
+        ],
+    },
+    "strike_moeda_unidade": {"type": "select", "resource": "price-units", "label_key": "nome", "value_key": "nome"},
+    "nome_da_operacao": {
+        "type": "select",
+        "resource": "derivative-operation-names",
+        "label_key": "nome",
+        "value_key": "nome",
+    },
+    "posicao": {
+        "type": "select",
+        "options": [
+            {"value": "Compra", "label": "Compra"},
+            {"value": "Venda", "label": "Venda"},
+        ],
+    },
+    "tipo_derivativo": {
+        "type": "select",
+        "options": [
+            {"value": "Call", "label": "Call"},
+            {"value": "Put", "label": "Put"},
+            {"value": "NDF", "label": "NDF"},
+        ],
+    },
+    "volume_financeiro_moeda": {"type": "select", "resource": "currencies", "label_key": "nome", "value_key": "nome"},
+    "volume_fisico_unidade": {"type": "select", "resource": "units", "label_key": "nome", "value_key": "nome"},
 }
 
 
@@ -121,8 +252,149 @@ def _is_local_import_enabled():
     return settings.DEBUG
 
 
-def _fetch_json_payload(url):
-    with urlopen(url, timeout=20) as response:
+def _parse_import_headers(raw_headers, authorization_header="", cookie_header=""):
+    headers = {
+        "Accept": "application/json,text/plain,*/*",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+        ),
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    }
+
+    if isinstance(raw_headers, dict):
+        iterable = raw_headers.items()
+    else:
+        iterable = []
+        if isinstance(raw_headers, str) and raw_headers.strip():
+            try:
+                parsed = json.loads(raw_headers)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, dict):
+                iterable = parsed.items()
+
+    for key, value in iterable:
+        if key and value not in (None, ""):
+            headers[str(key).strip()] = str(value).strip()
+
+    if authorization_header:
+        headers["Authorization"] = str(authorization_header).strip()
+    if cookie_header:
+        headers["Cookie"] = str(cookie_header).strip()
+
+    return headers
+
+
+def _build_import_database_targets():
+    return [
+        {
+            "value": "local",
+            "label": "Banco local (teste)",
+            "enabled": True,
+        }
+    ]
+
+
+def _build_import_destination_options():
+    return [
+        {"value": key, "label": config["label"], "enabled": True}
+        for key, config in IMPORT_TARGETS.items()
+    ]
+
+
+def _humanize_field_label(field):
+    return str(getattr(field, "verbose_name", field.name) or field.name).replace("_", " ").strip().capitalize()
+
+
+def _is_importable_field(field):
+    if getattr(field, "auto_created", False):
+        return False
+    if field.name in {"id", "tenant", "created_by", "created_at", "updated_at"}:
+        return False
+    if not getattr(field, "concrete", False) and not getattr(field, "many_to_many", False):
+        return False
+    return True
+
+
+def _build_target_field_options(destination):
+    config = IMPORT_TARGETS.get(destination)
+    if not config:
+        return [{"value": "ignore", "label": "Ignorar"}]
+
+    options = [{"value": "ignore", "label": "Ignorar"}]
+    for field in config["model"]._meta.get_fields():
+        if not _is_importable_field(field):
+            continue
+        label = _humanize_field_label(field)
+        if getattr(field, "many_to_many", False):
+            label = f"{label} (multi)"
+        options.append({"value": field.name, "label": label})
+    return options
+
+
+def _get_derivative_bulk_fields():
+    fields = []
+    for field in DerivativeOperation._meta.get_fields():
+        if not _is_importable_field(field):
+            continue
+
+        field_type = "text"
+        metadata = {
+            "name": field.name,
+            "label": _humanize_field_label(field),
+            "required": True,
+        }
+
+        if field.is_relation:
+            related_model = getattr(field, "related_model", None)
+            metadata.update(
+                {
+                    "type": "relation",
+                    "resource": next(
+                        (
+                            key
+                            for key, config in IMPORT_TARGETS.items()
+                            if config.get("model") is related_model
+                        ),
+                        None,
+                    ),
+                }
+            )
+
+            if related_model is EconomicGroup:
+                metadata["label_key"] = "grupo"
+            elif related_model is SubGroup:
+                metadata["label_key"] = "subgrupo"
+            elif related_model is Crop:
+                metadata["label_key"] = "ativo"
+            elif related_model is CropSeason:
+                metadata["label_key"] = "safra"
+            elif related_model is Counterparty:
+                metadata["label_key"] = "obs"
+            fields.append(metadata)
+            continue
+
+        if isinstance(field, models.DateField):
+            field_type = "date"
+        elif isinstance(field, models.DecimalField):
+            field_type = "number"
+        elif isinstance(field, (models.IntegerField, models.BigIntegerField, models.PositiveIntegerField, models.PositiveSmallIntegerField, models.FloatField)):
+            field_type = "number"
+        elif isinstance(field, models.TextField):
+            field_type = "text"
+
+        metadata["type"] = field_type
+        metadata.update(DERIVATIVE_BULK_SELECT_CONFIG.get(field.name, {}))
+        fields.append(metadata)
+
+    return fields
+
+
+def _fetch_json_payload(url, headers=None):
+    request = Request(url, headers=headers or {})
+    with urlopen(request, timeout=20) as response:
         return json.load(response)
 
 
@@ -150,13 +422,13 @@ def _set_url_cursor(url, cursor):
     return urlunparse(parsed._replace(query=urlencode(query)))
 
 
-def _fetch_all_rows(url):
+def _fetch_all_rows(url, headers=None):
     rows = []
     next_url = url
     page_guard = 0
 
     while next_url and page_guard < 100:
-        payload = _fetch_json_payload(next_url)
+        payload = _fetch_json_payload(next_url, headers=headers)
         current_rows, meta = _extract_results_and_meta(payload)
         rows.extend(current_rows if isinstance(current_rows, list) else [])
 
@@ -180,7 +452,28 @@ def _suggest_target_field(source_name):
     return "ignore"
 
 
-def _build_source_field_summary(rows):
+def _suggest_target_field_for_destination(source_name, destination):
+    normalized = _normalize_source_field(source_name)
+    if destination == "derivatives":
+        suggestion = _suggest_target_field(source_name)
+        if suggestion != "ignore":
+            return suggestion
+
+    config = IMPORT_TARGETS.get(destination)
+    if not config:
+        return "ignore"
+
+    for field in config["model"]._meta.get_fields():
+        if not _is_importable_field(field):
+            continue
+        normalized_field_name = _normalize_source_field(field.name)
+        normalized_field_label = _normalize_source_field(_humanize_field_label(field))
+        if normalized in {normalized_field_name, normalized_field_label}:
+            return field.name
+    return "ignore"
+
+
+def _build_source_field_summary(rows, destination):
     field_names = []
     for row in rows[:25]:
         if isinstance(row, dict):
@@ -203,7 +496,7 @@ def _build_source_field_summary(rows):
             {
                 "sourceField": field_name,
                 "sampleValue": sample,
-                "suggestedTargetField": _suggest_target_field(field_name),
+                "suggestedTargetField": _suggest_target_field_for_destination(field_name, destination),
             }
         )
     return summary
@@ -229,13 +522,39 @@ def _parse_date_value(value):
     return parse_date(str(value))
 
 
+def _parse_datetime_value(value):
+    if value in (None, ""):
+        return None
+    parsed = parse_datetime(str(value))
+    if parsed is not None:
+        return parsed
+    parsed_date = parse_date(str(value))
+    if parsed_date is not None:
+        return parsed_date
+    return None
+
+
+def _parse_boolean_value(value):
+    if value in (None, ""):
+        return False
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    return normalized in {"1", "true", "sim", "s", "yes", "y", "on"}
+
+
 def _lookup_group(tenant, value):
     raw = _normalize_import_key(value)
     if not raw:
         return None
     if raw.isdigit():
-        return EconomicGroup.objects.filter(tenant=tenant, pk=int(raw)).first()
-    return EconomicGroup.objects.filter(tenant=tenant, grupo__iexact=raw).first()
+        existing = EconomicGroup.objects.filter(tenant=tenant, pk=int(raw)).first()
+        if existing is not None:
+            return existing
+    existing = EconomicGroup.objects.filter(tenant=tenant, grupo__iexact=raw).first()
+    if existing is not None:
+        return existing
+    return EconomicGroup.objects.create(tenant=tenant, grupo=raw)
 
 
 def _lookup_subgroup(tenant, value):
@@ -243,33 +562,206 @@ def _lookup_subgroup(tenant, value):
     if not raw:
         return None
     if raw.isdigit():
-        return SubGroup.objects.filter(tenant=tenant, pk=int(raw)).first()
-    return SubGroup.objects.filter(tenant=tenant, subgrupo__iexact=raw).first()
+        existing = SubGroup.objects.filter(tenant=tenant, pk=int(raw)).first()
+        if existing is not None:
+            return existing
+    existing = SubGroup.objects.filter(tenant=tenant, subgrupo__iexact=raw).first()
+    if existing is not None:
+        return existing
+    return SubGroup.objects.create(tenant=tenant, subgrupo=raw)
 
 
 def _lookup_crop(value):
     raw = _normalize_import_key(value)
     if not raw:
         return None
-    return Crop.objects.filter(cultura__iexact=raw).first()
+    existing = Crop.objects.filter(ativo__iexact=raw).first()
+    if existing is not None:
+        return existing
+    return Crop.objects.create(ativo=raw)
 
 
 def _lookup_season(tenant, value):
     raw = _normalize_import_key(value)
     if not raw:
         return None
-    return CropSeason.objects.filter(tenant=tenant, safra__iexact=raw).first()
+    existing = CropSeason.objects.filter(tenant=tenant, safra__iexact=raw).first()
+    if existing is not None:
+        return existing
+    return CropSeason.objects.create(tenant=tenant, safra=raw)
 
 
 def _lookup_counterparty(tenant, value):
     raw = _normalize_import_key(value)
     if not raw:
         return None
-    return Counterparty.objects.filter(
+    existing = Counterparty.objects.filter(
         tenant=tenant
     ).filter(
-        Q(grupo__grupo__iexact=raw) | Q(subgrupo__subgrupo__iexact=raw)
+        Q(grupo__grupo__iexact=raw) | Q(subgrupo__subgrupo__iexact=raw) | Q(obs__iexact=raw)
     ).first()
+    if existing is not None:
+        return existing
+    return Counterparty.objects.create(tenant=tenant, obs=raw)
+
+
+def _lookup_related_instance(model, tenant, value):
+    raw = _normalize_import_key(value)
+    if not raw:
+        return None
+
+    if model is EconomicGroup:
+        return _lookup_group(tenant, raw)
+    if model is SubGroup:
+        return _lookup_subgroup(tenant, raw)
+    if model is Crop:
+        return _lookup_crop(raw)
+    if model is CropSeason:
+        return _lookup_season(tenant, raw)
+    if model is Counterparty:
+        return _lookup_counterparty(tenant, raw)
+
+    queryset = model.objects.all()
+    if any(field.name == "tenant" for field in model._meta.fields):
+        queryset = queryset.filter(tenant=tenant)
+
+    if raw.isdigit():
+        instance = queryset.filter(pk=int(raw)).first()
+        if instance is not None:
+            return instance
+
+    preferred_fields = [
+        "nome",
+        "name",
+        "grupo",
+        "subgrupo",
+        "safra",
+        "ativo",
+        "code",
+        "descricao_estrategia",
+        "obs",
+    ]
+    model_fields = {field.name for field in model._meta.fields}
+    for field_name in preferred_fields:
+        if field_name in model_fields:
+            instance = queryset.filter(**{f"{field_name}__iexact": raw}).first()
+            if instance is not None:
+                return instance
+            break
+
+    payload = {}
+    if "tenant" in model_fields:
+        payload["tenant"] = tenant
+
+    if "nome" in model_fields:
+        payload["nome"] = raw
+    elif "name" in model_fields:
+        payload["name"] = raw
+    elif "grupo" in model_fields:
+        payload["grupo"] = raw
+    elif "subgrupo" in model_fields:
+        payload["subgrupo"] = raw
+    elif "safra" in model_fields:
+        payload["safra"] = raw
+    elif "ativo" in model_fields:
+        payload["ativo"] = raw
+    elif "cultura" in model_fields:
+        payload["cultura"] = raw
+    elif "code" in model_fields:
+        payload["code"] = raw
+    elif "descricao_estrategia" in model_fields:
+        payload["descricao_estrategia"] = raw
+    elif "obs" in model_fields:
+        payload["obs"] = raw
+    else:
+        return None
+
+    try:
+        return model.objects.create(**payload)
+    except Exception:
+        return None
+
+
+def _split_import_values(raw_value):
+    if raw_value in (None, ""):
+        return []
+    if isinstance(raw_value, (list, tuple, set)):
+        return [item for item in raw_value if item not in (None, "")]
+    if isinstance(raw_value, str):
+        stripped = raw_value.strip()
+        if not stripped:
+            return []
+        if stripped.startswith("[") and stripped.endswith("]"):
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, list):
+                    return [item for item in parsed if item not in (None, "")]
+            except json.JSONDecodeError:
+                pass
+        parts = [item.strip() for item in re.split(r"[;,|]", stripped) if item.strip()]
+        return parts or [stripped]
+    return [raw_value]
+
+
+def _apply_generic_field_value(instance, field, raw_value, tenant, warnings, m2m_updates):
+    if getattr(field, "many_to_many", False):
+        resolved_items = []
+        for item in _split_import_values(raw_value):
+            resolved = _lookup_related_instance(field.related_model, tenant, item)
+            if resolved is None and item not in (None, ""):
+                warnings.append(f"{_humanize_field_label(field)} nao encontrado: {item}")
+                continue
+            if resolved is not None:
+                resolved_items.append(resolved)
+        m2m_updates[field.name] = resolved_items
+        return
+
+    if field.is_relation:
+        resolved = _lookup_related_instance(field.related_model, tenant, raw_value)
+        if resolved is None and raw_value not in (None, ""):
+            warnings.append(f"{_humanize_field_label(field)} nao encontrado: {raw_value}")
+        setattr(instance, field.name, resolved)
+        return
+
+    if isinstance(field, models.DateTimeField):
+        setattr(instance, field.name, _parse_datetime_value(raw_value))
+        return
+
+    if isinstance(field, models.DateField):
+        setattr(instance, field.name, _parse_date_value(raw_value))
+        return
+
+    if isinstance(field, models.DecimalField):
+        setattr(instance, field.name, _parse_decimal(raw_value))
+        return
+
+    if isinstance(field, (models.IntegerField, models.BigIntegerField, models.PositiveIntegerField, models.PositiveSmallIntegerField)):
+        decimal_value = _parse_decimal(raw_value)
+        setattr(instance, field.name, int(decimal_value) if decimal_value is not None else None)
+        return
+
+    if isinstance(field, (models.FloatField,)):
+        decimal_value = _parse_decimal(raw_value)
+        setattr(instance, field.name, float(decimal_value) if decimal_value is not None else None)
+        return
+
+    if isinstance(field, models.BooleanField):
+        setattr(instance, field.name, _parse_boolean_value(raw_value))
+        return
+
+    if isinstance(field, models.JSONField):
+        if isinstance(raw_value, str):
+            stripped = raw_value.strip()
+            if stripped.startswith("{") or stripped.startswith("["):
+                try:
+                    setattr(instance, field.name, json.loads(stripped))
+                    return
+                except json.JSONDecodeError:
+                    pass
+        setattr(instance, field.name, raw_value if raw_value is not None else field.default() if callable(field.default) else field.default)
+        return
+
+    setattr(instance, field.name, _normalize_import_key(raw_value))
 
 
 def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
@@ -290,11 +782,11 @@ def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
         instance.subgrupo = resolved
         return
 
-    if target_field == "cultura":
+    if target_field == "ativo":
         resolved = _lookup_crop(raw_value)
         if resolved is None and raw_value not in (None, ""):
-            warnings.append(f"Cultura nao encontrada: {raw_value}")
-        instance.cultura = resolved
+            warnings.append(f"Ativo nao encontrado: {raw_value}")
+        instance.ativo = resolved
         return
 
     if target_field == "destino_cultura":
@@ -330,8 +822,8 @@ def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
         "strike_liquidacao",
         "ajustes_totais_brl",
         "ajustes_totais_usd",
-        "volume_financeiro_valor_moeda_original",
-        "volume",
+        "volume_financeiro_valor",
+        "volume_fisico_valor",
     }:
         setattr(instance, target_field, _parse_decimal(raw_value))
         return
@@ -339,12 +831,26 @@ def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
     setattr(instance, target_field, _normalize_import_key(raw_value))
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def import_bubble_targets(request):
+    if not _is_local_import_enabled():
+        return Response({"detail": "Importacao provisoria disponivel apenas no ambiente local."}, status=status.HTTP_403_FORBIDDEN)
+
+    return Response(
+        {
+            "databaseTargets": _build_import_database_targets(),
+            "destinationOptions": _build_import_destination_options(),
+        }
+    )
+
+
 class DerivativeOperationViewSet(TenantScopedModelViewSet):
     queryset = DerivativeOperation.objects.select_related(
-        "tenant", "subgrupo", "grupo", "cultura", "safra", "contraparte", "created_by"
+        "tenant", "subgrupo", "grupo", "ativo", "safra", "contraparte", "created_by"
     ).all()
     serializer_class = DerivativeOperationSerializer
-    filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "contraparte", "status_operacao"]
+    filterset_fields = ["tenant", "subgrupo", "grupo", "ativo", "safra", "contraparte", "status_operacao"]
     search_fields = ["cod_operacao_mae", "nome_da_operacao", "bolsa_ref"]
 
     @action(detail=True, methods=["get", "post"], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
@@ -373,6 +879,68 @@ class DerivativeOperationViewSet(TenantScopedModelViewSet):
             for uploaded_file in files
         ]
         return Response(AttachmentSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="bulk-import-metadata")
+    def bulk_import_metadata(self, request):
+        return Response({"fields": _get_derivative_bulk_fields()})
+
+    @action(detail=False, methods=["post"], url_path="bulk-import")
+    def bulk_import(self, request):
+        rows = request.data.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return Response({"detail": "Envie ao menos uma linha para importar."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prepared_rows = []
+        row_errors = {}
+
+        for index, row in enumerate(rows):
+            row_number = index + 1
+            if not isinstance(row, dict):
+                row_errors[str(row_number)] = {"detail": "Linha invalida."}
+                continue
+
+            cleaned_row = {key: value for key, value in row.items() if value not in (None, [], {})}
+            prepared_rows.append((row_number, cleaned_row))
+
+        if row_errors:
+            return Response(
+                {"detail": "Existem linhas invalidas na importacao.", "rows": row_errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializers_to_create = []
+        for row_number, payload in prepared_rows:
+            serializer = self.get_serializer(data=payload)
+            if not serializer.is_valid():
+                row_errors[str(row_number)] = serializer.errors
+                continue
+            serializers_to_create.append((row_number, serializer))
+
+        if row_errors:
+            return Response(
+                {"detail": "Existem linhas invalidas na importacao.", "rows": row_errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if getattr(self.request.user, "tenant_id", None) is None:
+            return Response(
+                {"detail": "O usuario autenticado nao possui tenant vinculado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created_instances = []
+        with transaction.atomic():
+            for _row_number, serializer in serializers_to_create:
+                extra = {}
+                if hasattr(serializer.Meta.model, "tenant"):
+                    extra["tenant"] = self.request.user.tenant
+                if hasattr(serializer.Meta.model, "created_by"):
+                    extra["created_by"] = self.request.user
+                instance = serializer.save(**extra)
+                created_instances.append(instance)
+                self._create_audit_log("criado", instance, before={}, after=self._serialize_instance_for_log(instance))
+
+        return Response(self.get_serializer(created_instances, many=True).data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])
@@ -435,40 +1003,27 @@ def inspect_bubble_import(request):
     if not _is_local_import_enabled():
         return Response({"detail": "Importacao provisoria disponivel apenas no ambiente local."}, status=status.HTTP_403_FORBIDDEN)
 
-    url = _normalize_import_key(request.data.get("url"))
     raw_json = request.data.get("rawJson")
-    if not url and not str(raw_json or "").strip():
-        return Response({"detail": "Informe a URL do JSON ou cole o JSON bruto."}, status=status.HTTP_400_BAD_REQUEST)
+    destination = _normalize_import_key(request.data.get("destination")) or "derivatives"
+    if destination not in IMPORT_TARGETS:
+        return Response({"detail": "Tabela de destino invalida."}, status=status.HTTP_400_BAD_REQUEST)
+    if not str(raw_json or "").strip():
+        return Response({"detail": "Cole o JSON bruto para continuar."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        if str(raw_json or "").strip():
-            payload = _parse_supplied_payload(raw_json)
-            rows, _meta = _extract_results_and_meta(payload)
-        else:
-            rows = _fetch_all_rows(url)
-    except (URLError, TimeoutError, ValueError, json.JSONDecodeError):
-        return Response({"detail": "Nao foi possivel ler o JSON informado."}, status=status.HTTP_502_BAD_GATEWAY)
+        payload = _parse_supplied_payload(raw_json)
+        rows, _meta = _extract_results_and_meta(payload)
+    except (ValueError, json.JSONDecodeError):
+        return Response({"detail": "Nao foi possivel interpretar o JSON informado."}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response(
         {
-            "databaseTargets": [
-                {
-                    "value": "local",
-                    "label": "Banco local (teste)",
-                    "enabled": True,
-                }
-            ],
-            "destinationOptions": [
-                {
-                    "value": "derivatives",
-                    "label": "Derivativos",
-                    "enabled": True,
-                }
-            ],
-            "targetFields": TARGET_FIELD_OPTIONS,
+            "databaseTargets": _build_import_database_targets(),
+            "destinationOptions": _build_import_destination_options(),
+            "targetFields": _build_target_field_options(destination),
             "rowsFound": len(rows),
-            "urlReturnedEmpty": bool(url and not rows),
-            "sourceFields": _build_source_field_summary(rows),
+            "urlReturnedEmpty": False,
+            "sourceFields": _build_source_field_summary(rows, destination),
             "sampleRows": rows[:3],
         }
     )
@@ -482,30 +1037,26 @@ def import_bubble_derivatives(request):
 
     database_target = _normalize_import_key(request.data.get("databaseTarget"))
     destination = _normalize_import_key(request.data.get("destination"))
-    url = _normalize_import_key(request.data.get("url"))
     raw_json = request.data.get("rawJson")
+    target_config = IMPORT_TARGETS.get(destination)
     mapping = request.data.get("mapping") or {}
 
     if database_target != "local":
         return Response({"detail": "Por enquanto a importacao esta liberada apenas para o banco local."}, status=status.HTTP_400_BAD_REQUEST)
-    if destination != "derivatives":
-        return Response({"detail": "Por enquanto a importacao provisoria suporta apenas derivativos."}, status=status.HTTP_400_BAD_REQUEST)
-    if not url and not str(raw_json or "").strip():
-        return Response({"detail": "Informe a URL do JSON ou cole o JSON bruto."}, status=status.HTTP_400_BAD_REQUEST)
+    if target_config is None:
+        return Response({"detail": "Tabela de destino invalida."}, status=status.HTTP_400_BAD_REQUEST)
+    if not str(raw_json or "").strip():
+        return Response({"detail": "Cole o JSON bruto para continuar."}, status=status.HTTP_400_BAD_REQUEST)
     if not isinstance(mapping, dict):
         return Response({"detail": "Mapeamento invalido."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        if str(raw_json or "").strip():
-            payload = _parse_supplied_payload(raw_json)
-            rows, _meta = _extract_results_and_meta(payload)
-        else:
-            rows = _fetch_all_rows(url)
-    except (URLError, TimeoutError, ValueError, json.JSONDecodeError):
-        return Response({"detail": "Nao foi possivel ler o JSON informado."}, status=status.HTTP_502_BAD_GATEWAY)
+        payload = _parse_supplied_payload(raw_json)
+        rows, _meta = _extract_results_and_meta(payload)
+    except (ValueError, json.JSONDecodeError):
+        return Response({"detail": "Nao foi possivel interpretar o JSON informado."}, status=status.HTTP_400_BAD_REQUEST)
 
     created_count = 0
-    updated_count = 0
     skipped_count = 0
     warnings = []
 
@@ -515,32 +1066,48 @@ def import_bubble_derivatives(request):
             warnings.append(f"Linha {index}: formato invalido.")
             continue
 
-        import_key = _normalize_import_key(row.get("Cod operação mãe") or row.get("Cod operacao mae") or row.get("_id"))
-        if not import_key:
+        model = target_config["model"]
+        import_key = ""
+        if model is DerivativeOperation:
+            import_key = _normalize_import_key(row.get("Cod operação mãe") or row.get("Cod operacao mae") or row.get("_id"))
+        if model is DerivativeOperation and not import_key:
             skipped_count += 1
             warnings.append(f"Linha {index}: sem chave de importacao.")
             continue
 
-        instance = DerivativeOperation.objects.filter(tenant=request.user.tenant, cod_operacao_mae=import_key).order_by("id").first()
-        is_new = instance is None
-        if instance is None:
-            instance = DerivativeOperation(tenant=request.user.tenant, created_by=request.user, cod_operacao_mae=import_key)
+        instance = model()
+        if any(field.name == "tenant" for field in model._meta.fields):
+            instance.tenant = request.user.tenant
+        if any(field.name == "created_by" for field in model._meta.fields):
+            instance.created_by = request.user
+        if model is DerivativeOperation and import_key:
+            instance.cod_operacao_mae = import_key
 
         row_warnings = []
+        m2m_updates = {}
         for source_field, target_field in mapping.items():
             if target_field == "ignore":
                 continue
             raw_value = row.get(source_field)
-            _apply_mapped_value(instance, target_field, raw_value, request.user.tenant, row_warnings)
+            try:
+                field = model._meta.get_field(target_field)
+            except Exception:
+                row_warnings.append(f"Campo de destino invalido: {target_field}")
+                continue
 
-        if not instance.cod_operacao_mae:
+            if model is DerivativeOperation:
+                _apply_mapped_value(instance, target_field, raw_value, request.user.tenant, row_warnings)
+            else:
+                _apply_generic_field_value(instance, field, raw_value, request.user.tenant, row_warnings, m2m_updates)
+
+        if model is DerivativeOperation and not instance.cod_operacao_mae:
             instance.cod_operacao_mae = import_key
 
         instance.save()
-        if is_new:
-            created_count += 1
-        else:
-            updated_count += 1
+        for field_name, values in m2m_updates.items():
+            getattr(instance, field_name).set(values)
+
+        created_count += 1
 
         for warning in row_warnings[:5]:
             warnings.append(f"Linha {index}: {warning}")
@@ -548,7 +1115,6 @@ def import_bubble_derivatives(request):
     return Response(
         {
             "created": created_count,
-            "updated": updated_count,
             "skipped": skipped_count,
             "warnings": warnings[:100],
             "rowsProcessed": len(rows),

@@ -1,0 +1,396 @@
+from django.db import transaction
+from rest_framework.exceptions import PermissionDenied
+from rest_framework import serializers
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.accounts.views import TenantViewSet, UserViewSet
+from apps.catalog.views import (
+    CropViewSet,
+    CurrencyViewSet,
+    DerivativeOperationNameViewSet,
+    ExchangeViewSet,
+    PriceUnitViewSet,
+    UnitViewSet,
+)
+from apps.clients.views import CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
+from apps.core.viewsets import TenantScopedModelViewSet
+from apps.derivatives.views import DerivativeOperationViewSet
+from apps.physical.views import (
+    ActualCostViewSet,
+    BudgetCostViewSet,
+    CashPaymentViewSet,
+    PhysicalPaymentViewSet,
+    PhysicalQuoteViewSet,
+    PhysicalSaleViewSet,
+)
+from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet
+
+
+RESOURCE_REGISTRY = {
+    "tenants": {"label": "Tenants", "viewset": TenantViewSet, "module": "sys_tenants", "superuser_only": True},
+    "groups": {"label": "Grupo", "viewset": EconomicGroupViewSet, "module": "cad_groups"},
+    "subgroups": {"label": "Subgrupo", "viewset": SubGroupViewSet, "module": "cad_subgroups"},
+    "crops": {"label": "Ativo", "viewset": CropViewSet, "module": "sys_crops", "superuser_only": True},
+    "currencies": {"label": "Moeda", "viewset": CurrencyViewSet, "module": "sys_currencies", "superuser_only": True},
+    "units": {"label": "Unidade", "viewset": UnitViewSet, "module": "sys_units", "superuser_only": True},
+    "price-units": {"label": "Moeda/Unidade", "viewset": PriceUnitViewSet, "module": "sys_price_units", "superuser_only": True},
+    "exchanges": {"label": "Bolsa", "viewset": ExchangeViewSet, "module": "sys_exchanges", "superuser_only": True},
+    "derivative-operation-names": {
+        "label": "Nome Operacoes Derivativos",
+        "viewset": DerivativeOperationNameViewSet,
+        "module": "sys_derivative_operation_names",
+        "superuser_only": True,
+    },
+    "seasons": {"label": "Safra", "viewset": CropSeasonViewSet, "module": "sys_seasons", "superuser_only": True},
+    "counterparties": {"label": "Contrapartes", "viewset": CounterpartyViewSet, "module": "cad_counterparties"},
+    "physical-quotes": {"label": "Cotacoes Fisico", "viewset": PhysicalQuoteViewSet, "module": "ops_physical_quotes"},
+    "budget-costs": {"label": "Custo Orcamento", "viewset": BudgetCostViewSet, "module": "ops_budget_costs"},
+    "actual-costs": {"label": "Custo Realizado", "viewset": ActualCostViewSet, "module": "ops_actual_costs"},
+    "derivative-operations": {"label": "Derivativos", "viewset": DerivativeOperationViewSet, "module": "ops_derivatives"},
+    "physical-sales": {"label": "Vendas Fisico", "viewset": PhysicalSaleViewSet, "module": "ops_physical_sales"},
+    "physical-payments": {"label": "Pgtos Fisico", "viewset": PhysicalPaymentViewSet, "module": "ops_physical_payments"},
+    "cash-payments": {"label": "Pgtos Caixa", "viewset": CashPaymentViewSet, "module": "ops_cash_payments"},
+    "strategies": {"label": "Estrategias", "viewset": StrategyViewSet, "module": "ops_strategies"},
+    "strategy-triggers": {"label": "Gatilhos", "viewset": StrategyTriggerViewSet, "module": "ops_triggers"},
+    "hedge-policies": {"label": "Politica de Hedge", "viewset": HedgePolicyViewSet, "module": "ops_hedge_policies"},
+    "crop-boards": {"label": "Quadro Safra", "viewset": CropBoardViewSet, "module": "ops_crop_boards"},
+    "users": {"label": "Usuarios", "viewset": UserViewSet, "module": "sys_users"},
+}
+
+MODEL_LABEL_TO_RESOURCE = {}
+for resource_name, config in RESOURCE_REGISTRY.items():
+    model = getattr(getattr(config["viewset"], "serializer_class", None), "Meta", None)
+    if getattr(model, "model", None):
+        MODEL_LABEL_TO_RESOURCE[model.model._meta.label] = resource_name
+
+
+EXCLUDED_UPDATE_FIELDS = {"id", "tenant", "created_at", "updated_at", "created_by", "attachments", "password"}
+EXCLUDED_FILTER_FIELDS = {"id", "created_at", "updated_at", "created_by", "attachments", "password"}
+
+
+def _ensure_tool_access(request):
+    if request.user.is_superuser:
+        return
+    if getattr(request.user, "has_module_access", lambda *_args: False)("sys_mass_update"):
+        return
+    raise PermissionDenied("Voce nao possui acesso a ferramenta de alteracao em massa.")
+
+
+def _user_has_access(user, config):
+    if config.get("superuser_only") and not user.is_superuser:
+        return False
+    module_code = config.get("module")
+    if not module_code:
+        return True
+    return bool(user.is_superuser or getattr(user, "has_module_access", lambda *_args: False)(module_code))
+
+
+def _get_resource_config(request, resource):
+    config = RESOURCE_REGISTRY.get(resource)
+    if not config:
+        raise serializers.ValidationError({"resource": "Recurso nao suportado para alteracao em massa."})
+    if not _user_has_access(request.user, config):
+        raise serializers.ValidationError({"resource": "Voce nao possui acesso a este recurso."})
+    return config
+
+
+def _build_viewset(viewset_class, request):
+    viewset = viewset_class()
+    viewset.request = request
+    viewset.action = "list"
+    viewset.format_kwarg = None
+    viewset.kwargs = {}
+    return viewset
+
+
+def _get_base_queryset(viewset_class, request):
+    return _build_viewset(viewset_class, request).get_queryset()
+
+
+def _get_serializer(viewset_class, request, *args, **kwargs):
+    serializer_class = viewset_class.serializer_class
+    kwargs.setdefault("context", {"request": request})
+    return serializer_class(*args, **kwargs)
+
+
+def _normalize_filter_value(raw_value):
+    if isinstance(raw_value, list):
+        return [item for item in raw_value if item not in ("", None)]
+    return raw_value
+
+
+def _normalize_filter_conditions(filters):
+    if isinstance(filters, list):
+        return filters
+    if isinstance(filters, dict):
+        return [{"field": field_name, "value": value} for field_name, value in filters.items()]
+    return []
+
+
+def _apply_filters(queryset, filters, filter_field_map):
+    for item in _normalize_filter_conditions(filters):
+        field_name = item.get("field")
+        if not field_name or field_name not in filter_field_map:
+            continue
+
+        field_meta = filter_field_map[field_name]
+        normalized = _normalize_filter_value(item.get("value"))
+        if normalized in ("", None, []):
+            continue
+
+        lookup = item.get("lookup") or field_meta.get("defaultLookup") or "exact"
+        if isinstance(normalized, list):
+            queryset = queryset.filter(**{f"{field_name}__in": normalized})
+        else:
+            queryset = queryset.filter(**{f"{field_name}__{lookup}": normalized} if lookup != "exact" else {field_name: normalized})
+    return queryset
+
+
+def _apply_search(queryset, viewset_class, search_term):
+    term = str(search_term or "").strip()
+    if not term:
+        return queryset
+    search_fields = getattr(viewset_class, "search_fields", []) or []
+    if not search_fields:
+        return queryset
+    from django.db.models import Q
+
+    query = Q()
+    for field_name in search_fields:
+        query |= Q(**{f"{field_name}__icontains": term})
+    return queryset.filter(query)
+
+
+def _apply_update_match_filters(queryset, updates):
+    for update in updates or []:
+        field_name = update.get("field")
+        match_current = bool(update.get("matchCurrent"))
+        from_value = update.get("fromValue")
+        if not field_name or not match_current:
+            continue
+        if isinstance(from_value, list):
+            values = [item for item in from_value if item not in ("", None)]
+            if values:
+                queryset = queryset.filter(**{f"{field_name}__in": values})
+            continue
+        if from_value in ("", None):
+            continue
+        queryset = queryset.filter(**{field_name: from_value})
+    return queryset
+
+
+def _serialize_preview_value(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return str(value)
+
+
+def _get_audit_helper(request):
+    helper = TenantScopedModelViewSet()
+    helper.request = request
+    return helper
+
+
+def _resolve_field_meta(field_name, serializer_field):
+    field_type = "text"
+    related_resource = None
+    options = None
+    default_lookup = "icontains"
+
+    if isinstance(serializer_field, serializers.BooleanField):
+        field_type = "boolean"
+        options = [{"value": True, "label": "Sim"}, {"value": False, "label": "Nao"}]
+        default_lookup = "exact"
+    elif isinstance(serializer_field, serializers.ChoiceField):
+        field_type = "select"
+        options = [{"value": key, "label": str(value)} for key, value in serializer_field.choices.items()]
+        default_lookup = "exact"
+    elif isinstance(serializer_field, (serializers.IntegerField, serializers.FloatField, serializers.DecimalField)):
+        field_type = "number"
+        default_lookup = "exact"
+    elif isinstance(serializer_field, serializers.DateField):
+        field_type = "date"
+        default_lookup = "exact"
+    elif isinstance(serializer_field, serializers.DateTimeField):
+        field_type = "datetime"
+        default_lookup = "exact"
+    elif isinstance(serializer_field, serializers.PrimaryKeyRelatedField):
+        field_type = "relation"
+        queryset = getattr(serializer_field, "queryset", None)
+        model = getattr(queryset, "model", None)
+        if model is not None:
+            related_resource = MODEL_LABEL_TO_RESOURCE.get(model._meta.label)
+        default_lookup = "exact"
+    elif isinstance(serializer_field, serializers.ManyRelatedField):
+        field_type = "multirelation"
+        child_relation = getattr(serializer_field, "child_relation", None)
+        queryset = getattr(child_relation, "queryset", None)
+        model = getattr(queryset, "model", None)
+        if model is not None:
+            related_resource = MODEL_LABEL_TO_RESOURCE.get(model._meta.label)
+        default_lookup = "in"
+    elif isinstance(serializer_field, serializers.ListField):
+        field_type = "list"
+
+    return {
+        "name": field_name,
+        "label": serializer_field.label or field_name.replace("_", " ").title(),
+        "type": field_type,
+        "required": serializer_field.required,
+        "allowNull": getattr(serializer_field, "allow_null", False),
+        "relatedResource": related_resource,
+        "options": options,
+        "defaultLookup": default_lookup,
+    }
+
+
+def _build_resource_metadata(resource, config, request):
+    serializer = _get_serializer(config["viewset"], request)
+    fields = serializer.fields
+    update_fields = []
+    filter_fields = []
+
+    for field_name, serializer_field in fields.items():
+        if isinstance(serializer_field, serializers.HiddenField):
+            continue
+
+        meta = _resolve_field_meta(field_name, serializer_field)
+
+        if not serializer_field.write_only and field_name not in EXCLUDED_FILTER_FIELDS and meta["type"] not in {"list", "multirelation"}:
+            filter_fields.append(meta)
+
+        if serializer_field.read_only or serializer_field.write_only:
+            continue
+        if field_name in EXCLUDED_UPDATE_FIELDS:
+            continue
+        if meta["type"] in {"list", "multirelation"}:
+            continue
+        update_fields.append(meta)
+
+    return {
+        "resource": resource,
+        "label": config["label"],
+        "filters": filter_fields,
+        "updateFields": update_fields,
+        "searchEnabled": bool(getattr(config["viewset"], "search_fields", []) or []),
+    }
+
+
+def _get_filtered_queryset(request, resource, filters, search_term, updates):
+    config = _get_resource_config(request, resource)
+    queryset = _get_base_queryset(config["viewset"], request)
+    metadata = _build_resource_metadata(resource, config, request)
+    filter_field_map = {item["name"]: item for item in metadata["filters"]}
+    queryset = _apply_filters(queryset, filters, filter_field_map)
+    queryset = _apply_search(queryset, config["viewset"], search_term)
+    queryset = _apply_update_match_filters(queryset, updates)
+    return queryset.distinct(), config
+
+
+def _build_payload(updates):
+    payload = {}
+    for update in updates or []:
+        field_name = update.get("field")
+        if not field_name:
+            continue
+        if update.get("clearTarget"):
+            payload[field_name] = None
+            continue
+        payload[field_name] = update.get("toValue")
+    return payload
+
+
+class MassUpdateResourcesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        _ensure_tool_access(request)
+        resources = [
+            {"value": resource, "label": config["label"], "module": config.get("module")}
+            for resource, config in RESOURCE_REGISTRY.items()
+            if _user_has_access(request.user, config)
+        ]
+        return Response({"resources": resources})
+
+
+class MassUpdateMetadataView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        _ensure_tool_access(request)
+        resource = request.query_params.get("resource")
+        config = _get_resource_config(request, resource)
+        return Response(_build_resource_metadata(resource, config, request))
+
+
+class MassUpdatePreviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        _ensure_tool_access(request)
+        resource = request.data.get("resource")
+        filters = request.data.get("filters") or {}
+        updates = request.data.get("updates") or []
+        search_term = request.data.get("search") or ""
+        queryset, config = _get_filtered_queryset(request, resource, filters, search_term, updates)
+        preview_items = list(queryset.values("id")[:5])
+        return Response(
+            {
+                "resource": resource,
+                "label": config["label"],
+                "affectedCount": queryset.count(),
+                "sampleIds": [item["id"] for item in preview_items],
+            }
+        )
+
+
+class MassUpdateApplyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        _ensure_tool_access(request)
+        resource = request.data.get("resource")
+        filters = request.data.get("filters") or {}
+        updates = request.data.get("updates") or []
+        search_term = request.data.get("search") or ""
+
+        if not updates:
+            raise serializers.ValidationError({"updates": "Informe pelo menos uma alteracao."})
+
+        queryset, config = _get_filtered_queryset(request, resource, filters, search_term, updates)
+        payload = _build_payload(updates)
+        if not payload:
+            raise serializers.ValidationError({"updates": "Nao foi possivel montar as alteracoes solicitadas."})
+
+        helper = _get_audit_helper(request)
+        updated_count = 0
+        updated_ids = []
+
+        with transaction.atomic():
+            for instance in queryset:
+                before = helper._serialize_instance_for_log(instance)
+                serializer = _get_serializer(config["viewset"], request, instance, data=payload, partial=True)
+                serializer.is_valid(raise_exception=True)
+                updated_instance = serializer.save()
+                helper._create_audit_log(
+                    "alterado",
+                    updated_instance,
+                    before=before,
+                    after=helper._serialize_instance_for_log(updated_instance),
+                )
+                updated_count += 1
+                if len(updated_ids) < 20:
+                    updated_ids.append(updated_instance.pk)
+
+        return Response(
+            {
+                "resource": resource,
+                "label": config["label"],
+                "updatedCount": updated_count,
+                "updatedIds": updated_ids,
+            }
+        )

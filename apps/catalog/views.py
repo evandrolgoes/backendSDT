@@ -28,7 +28,7 @@ class CropViewSet(viewsets.ModelViewSet):
     queryset = Crop.objects.all()
     serializer_class = CropSerializer
     permission_classes = [AdminWriteCatalogPermission]
-    search_fields = ["cultura"]
+    search_fields = ["ativo"]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
 

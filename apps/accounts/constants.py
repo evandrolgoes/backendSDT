@@ -29,7 +29,7 @@ AVAILABLE_MODULES = [
     ("ops_crop_boards", "Operacoes: Quadro Safra"),
     ("ops_physical_sales", "Operacoes: Vendas Fisico"),
     ("sys_tenants", "Sistema: Tenants"),
-    ("sys_crops", "Sistema: Culturas"),
+    ("sys_crops", "Sistema: Ativos"),
     ("sys_currencies", "Sistema: Moedas"),
     ("sys_units", "Sistema: Unidades"),
     ("sys_price_units", "Sistema: Moeda/Unidade"),
@@ -41,6 +41,7 @@ AVAILABLE_MODULES = [
     ("sys_admin_invites", "Sistema: Convites Admin"),
     ("sys_logs", "Sistema: Logs"),
     ("sys_json_import", "Sistema: Importador JSON"),
+    ("sys_mass_update", "Sistema: Alteracao em Massa"),
 ]
 
 AVAILABLE_MODULE_CODES = [code for code, _label in AVAILABLE_MODULES]

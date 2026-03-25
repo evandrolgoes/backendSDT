@@ -2,16 +2,16 @@ from django.db import models
 
 
 class Crop(models.Model):
-    cultura = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    ativo = models.CharField(max_length=100, unique=True, null=True, blank=True)
     bolsa_ref = models.JSONField(default=list, blank=True)
     imagem = models.ImageField(upload_to="crops/", null=True, blank=True)
     unidade_fisico = models.ManyToManyField("catalog.Unit", blank=True, related_name="culturas")
 
     class Meta:
-        ordering = ["cultura"]
+        ordering = ["ativo"]
 
     def __str__(self):
-        return self.cultura
+        return self.ativo
 
 
 class MarketInstrument(models.Model):
@@ -69,7 +69,7 @@ class PriceUnit(models.Model):
 
 class Exchange(models.Model):
     nome = models.CharField(max_length=60, unique=True)
-    cultura = models.CharField(max_length=100, blank=True)
+    ativo = models.CharField(max_length=100, blank=True)
     moeda_bolsa = models.CharField(max_length=40, blank=True)
     volume_padrao_contrato = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     unidade_bolsa = models.CharField(max_length=40, blank=True)

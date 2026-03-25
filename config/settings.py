@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "apps.auditing",
     "apps.leads",
     "apps.tradingview_scraper",
+    "apps.mass_update",
 ]
 
 MIDDLEWARE = [
