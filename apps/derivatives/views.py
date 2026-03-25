@@ -5,7 +5,6 @@ from urllib.error import URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Q
@@ -248,11 +247,6 @@ def _normalize_source_field(value):
         .replace(":", "")
     )
 
-
-def _is_local_import_enabled():
-    return settings.DEBUG
-
-
 def _parse_import_headers(raw_headers, authorization_header="", cookie_header=""):
     headers = {
         "Accept": "application/json,text/plain,*/*",
@@ -291,8 +285,8 @@ def _parse_import_headers(raw_headers, authorization_header="", cookie_header=""
 def _build_import_database_targets():
     return [
         {
-            "value": "local",
-            "label": "Banco local (teste)",
+            "value": "current",
+            "label": "Banco atual desta instancia",
             "enabled": True,
         }
     ]
@@ -835,9 +829,6 @@ def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def import_bubble_targets(request):
-    if not _is_local_import_enabled():
-        return Response({"detail": "Importacao provisoria disponivel apenas no ambiente local."}, status=status.HTTP_403_FORBIDDEN)
-
     return Response(
         {
             "databaseTargets": _build_import_database_targets(),
@@ -939,9 +930,6 @@ def derivative_contracts(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def inspect_bubble_import(request):
-    if not _is_local_import_enabled():
-        return Response({"detail": "Importacao provisoria disponivel apenas no ambiente local."}, status=status.HTTP_403_FORBIDDEN)
-
     raw_json = request.data.get("rawJson")
     destination = _normalize_import_key(request.data.get("destination")) or "derivatives"
     if destination not in IMPORT_TARGETS:
@@ -971,17 +959,14 @@ def inspect_bubble_import(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def import_bubble_derivatives(request):
-    if not _is_local_import_enabled():
-        return Response({"detail": "Importacao provisoria disponivel apenas no ambiente local."}, status=status.HTTP_403_FORBIDDEN)
-
     database_target = _normalize_import_key(request.data.get("databaseTarget"))
     destination = _normalize_import_key(request.data.get("destination"))
     raw_json = request.data.get("rawJson")
     target_config = IMPORT_TARGETS.get(destination)
     mapping = request.data.get("mapping") or {}
 
-    if database_target != "local":
-        return Response({"detail": "Por enquanto a importacao esta liberada apenas para o banco local."}, status=status.HTTP_400_BAD_REQUEST)
+    if database_target not in {"", "current"}:
+        return Response({"detail": "Banco de destino invalido."}, status=status.HTTP_400_BAD_REQUEST)
     if target_config is None:
         return Response({"detail": "Tabela de destino invalida."}, status=status.HTTP_400_BAD_REQUEST)
     if not str(raw_json or "").strip():
