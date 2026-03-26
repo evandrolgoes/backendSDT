@@ -372,15 +372,16 @@ class Command(BaseCommand):
                 "data_pagamento": "2026-04-25",
                 "dolar_de_venda": 5.77,
                 "moeda_contrato": "R$",
+                "moeda_unidade": "R$/sc",
                 "objetivo_venda_dolarizada": "Protecao da margem",
                 "pf_paf": "PF",
                 "preco": 131.8,
                 "unidade_contrato": "sc",
                 "volume_fisico": 8450.0,
+                "grupo": grupo_alpha,
+                "subgrupo": subgrupo_norte,
             },
         )
-        venda_fisica.grupos.set([grupo_alpha])
-        venda_fisica.subgrupos.set([subgrupo_norte])
 
         venda_fisica_milho, _ = PhysicalSale.objects.get_or_create(
             tenant_id=tenant,
@@ -402,14 +403,15 @@ class Command(BaseCommand):
                 "data_pagamento": "2026-08-18",
                 "dolar_de_venda": 5.7,
                 "moeda_contrato": "R$",
+                "moeda_unidade": "R$/sc",
                 "objetivo_venda_dolarizada": "Caixa de safra",
                 "pf_paf": "PAF",
                 "preco": 70.9,
                 "unidade_contrato": "sc",
                 "volume_fisico": 9620.0,
+                "grupo": grupo_sertao,
+                "subgrupo": subgrupo_leste,
             },
         )
-        venda_fisica_milho.grupos.set([grupo_sertao])
-        venda_fisica_milho.subgrupos.set([subgrupo_leste])
 
         self.stdout.write(self.style.SUCCESS("Initial data seeded successfully."))

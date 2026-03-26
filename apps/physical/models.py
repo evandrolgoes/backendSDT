@@ -59,12 +59,14 @@ class ActualCost(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
 class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
-    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="vendas_fisico")
-    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="vendas_fisico")
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
+    localidade = models.CharField(max_length=120, blank=True)
     basis_valor = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     basis_moeda = models.CharField(max_length=30, blank=True)
     bolsa_ref = models.CharField(max_length=50, blank=True)
+    contrato_bolsa = models.CharField(max_length=50, blank=True)
     cif_fob = models.CharField(max_length=20, blank=True)
     compra_venda = models.CharField(max_length=20, blank=True)
     contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
@@ -76,11 +78,13 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     dolar_de_venda = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
     faturamento_total_contrato = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     moeda_contrato = models.CharField(max_length=20, blank=True)
+    moeda_unidade = models.CharField(max_length=30, blank=True)
     objetivo_venda_dolarizada = models.CharField(max_length=120, blank=True)
     pf_paf = models.CharField(max_length=20, blank=True)
     preco = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     unidade_contrato = models.CharField(max_length=20, null=True, blank=True)
     volume_fisico = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    obs = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-data_negociacao", "-created_at"]
@@ -89,6 +93,8 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         return f"Venda fisico {self.id}"
 
     def save(self, *args, **kwargs):
+        if not self.moeda_unidade and self.moeda_contrato and self.unidade_contrato:
+            self.moeda_unidade = f"{self.moeda_contrato}/{self.unidade_contrato}"
         if self.volume_fisico is not None and self.preco is not None:
             self.faturamento_total_contrato = Decimal(self.volume_fisico) * Decimal(self.preco)
         else:

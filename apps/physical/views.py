@@ -40,10 +40,10 @@ class ActualCostViewSet(TenantScopedModelViewSet):
 
 
 class PhysicalSaleViewSet(TenantScopedModelViewSet):
-    queryset = PhysicalSale.objects.select_related("tenant", "cultura", "safra", "contraparte", "created_by").prefetch_related("grupos", "subgrupos").all()
+    queryset = PhysicalSale.objects.select_related("tenant", "grupo", "subgrupo", "cultura", "safra", "contraparte", "created_by").all()
     serializer_class = PhysicalSaleSerializer
-    filterset_fields = ["tenant", "cultura", "safra", "contraparte", "compra_venda", "moeda_contrato"]
-    search_fields = ["cultura_produto", "objetivo_venda_dolarizada"]
+    filterset_fields = ["tenant", "grupo", "subgrupo", "cultura", "safra", "contraparte", "compra_venda", "moeda_contrato", "moeda_unidade", "bolsa_ref", "contrato_bolsa", "localidade"]
+    search_fields = ["cultura_produto", "objetivo_venda_dolarizada", "localidade", "contrato_bolsa", "obs"]
 
     @action(detail=True, methods=["get", "post"], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def attachments(self, request, pk=None):
