@@ -70,8 +70,8 @@ class HedgePolicy(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
 class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
-    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="quadros_safra")
-    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="quadros_safra")
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
     localidade = models.JSONField(default=list, blank=True)
     area = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)

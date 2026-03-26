@@ -45,9 +45,9 @@ class HedgePolicyViewSet(TenantScopedModelViewSet):
 
 
 class CropBoardViewSet(TenantScopedModelViewSet):
-    queryset = CropBoard.objects.select_related("tenant", "cultura", "safra", "created_by").prefetch_related("grupos", "subgrupos").all()
+    queryset = CropBoard.objects.select_related("tenant", "grupo", "subgrupo", "cultura", "safra", "created_by").all()
     serializer_class = CropBoardSerializer
-    filterset_fields = ["tenant", "cultura", "safra", "monitorar_vc", "criar_politica_hedge"]
+    filterset_fields = ["tenant", "grupo", "subgrupo", "cultura", "safra", "monitorar_vc", "criar_politica_hedge"]
     search_fields = ["obs", "bolsa_ref", "unidade_producao", "localidade"]
 
 
