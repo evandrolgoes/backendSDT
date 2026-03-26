@@ -45,6 +45,7 @@ class ActualCost(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
     cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos_realizados")
+    data_travamento = models.DateField(null=True, blank=True)
     grupo_despesa = models.CharField(max_length=120)
     moeda = models.CharField(max_length=20)
     valor = models.DecimalField(max_digits=18, decimal_places=2)

@@ -7,6 +7,7 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from apps.anotacoes.views import AnotacaoViewSet, anotacoes_health
 from apps.accounts.views import (
     AccessRequestView,
     AdminInvitationViewSet,
@@ -42,6 +43,7 @@ from apps.mass_update.views import (
     MassUpdateResourcesView,
 )
 from apps.mercado.views import MarketNewsPostViewSet, mercado_health
+from apps.payables.views import AccountsPayableViewSet
 from apps.leads.views import LeadCreateView
 from apps.physical.views import (
     ActualCostViewSet,
@@ -51,6 +53,7 @@ from apps.physical.views import (
     PhysicalQuoteViewSet,
     PhysicalSaleViewSet,
 )
+from apps.receivables.views import ReceiptEntryViewSet
 from apps.risk.views import ExposurePositionViewSet
 from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
 from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
@@ -80,6 +83,7 @@ router.register("actual-costs", ActualCostViewSet, basename="actual-cost")
 router.register("physical-sales", PhysicalSaleViewSet, basename="physical-sale")
 router.register("physical-payments", PhysicalPaymentViewSet, basename="physical-payment")
 router.register("cash-payments", CashPaymentViewSet, basename="cash-payment")
+router.register("receipt-entries", ReceiptEntryViewSet, basename="receipt-entry")
 router.register("derivative-operations", DerivativeOperationViewSet, basename="derivative-operation")
 router.register("strategies", StrategyViewSet, basename="strategy")
 router.register("strategy-triggers", StrategyTriggerViewSet, basename="strategy-trigger")
@@ -93,12 +97,15 @@ router.register("audit-logs", AuditLogViewSet, basename="audit-log")
 router.register("attachments", AttachmentViewSet, basename="attachment")
 router.register("tradingview-watchlist-quotes", TradingViewWatchlistQuoteViewSet, basename="tradingview-watchlist-quote")
 router.register("market-news-posts", MarketNewsPostViewSet, basename="market-news-post")
+router.register("anotacoes", AnotacaoViewSet, basename="anotacao")
+router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-payable")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
     path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
     path("api/mercado/health/", mercado_health, name="mercado_health"),
+    path("api/anotacoes/health/", anotacoes_health, name="anotacoes_health"),
     path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
     path("api/import-tools/bubble/targets/", import_bubble_targets, name="import_bubble_targets"),
     path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),

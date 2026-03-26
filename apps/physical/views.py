@@ -35,7 +35,7 @@ class BudgetCostViewSet(TenantScopedModelViewSet):
 class ActualCostViewSet(TenantScopedModelViewSet):
     queryset = ActualCost.objects.select_related("tenant", "subgrupo", "grupo", "cultura", "safra", "created_by").all()
     serializer_class = ActualCostSerializer
-    filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "moeda"]
+    filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "moeda", "data_travamento"]
     search_fields = ["grupo_despesa", "obs"]
 
 
