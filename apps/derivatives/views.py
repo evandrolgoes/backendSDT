@@ -38,7 +38,7 @@ SOURCE_FIELD_ALIASES = {
     "safra": ["safra"],
     "bolsa_ref": ["bolsaref"],
     "status_operacao": ["status"],
-    "contraparte": ["contraparteinstituicao"],
+    "contraparte": ["contraparteinstituicao", "contraparte"],
     "data_contratacao": ["datacontratacao"],
     "data_liquidacao": ["dataliquidacao"],
     "contrato_derivativo": ["contratoderivativo"],
@@ -372,7 +372,7 @@ def _get_derivative_bulk_fields():
             elif related_model is CropSeason:
                 metadata["label_key"] = "safra"
             elif related_model is Counterparty:
-                metadata["label_key"] = "obs"
+                metadata["label_key"] = "contraparte"
             fields.append(metadata)
             continue
 
@@ -602,7 +602,7 @@ def _lookup_counterparty(tenant, value):
     ).first()
     if existing is not None:
         return existing
-    return Counterparty.objects.create(tenant=tenant, obs=raw)
+    return Counterparty.objects.create(tenant=tenant, contraparte=raw, obs=raw)
 
 
 def _lookup_related_instance(model, tenant, value):
@@ -639,6 +639,7 @@ def _lookup_related_instance(model, tenant, value):
         "ativo",
         "code",
         "descricao_estrategia",
+        "contraparte",
         "obs",
     ]
     model_fields = {field.name for field in model._meta.fields}
@@ -671,6 +672,8 @@ def _lookup_related_instance(model, tenant, value):
         payload["code"] = raw
     elif "descricao_estrategia" in model_fields:
         payload["descricao_estrategia"] = raw
+    elif "contraparte" in model_fields:
+        payload["contraparte"] = raw
     elif "obs" in model_fields:
         payload["obs"] = raw
     else:

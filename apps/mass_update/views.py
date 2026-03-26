@@ -277,7 +277,7 @@ def _resolve_field_meta(field_name, serializer_field):
             elif related_resource == "seasons":
                 label_key = "safra"
             elif related_resource == "counterparties":
-                label_key = "obs"
+                label_key = "contraparte"
         default_lookup = "exact"
     elif isinstance(serializer_field, serializers.ManyRelatedField):
         field_type = "multirelation"
@@ -295,7 +295,7 @@ def _resolve_field_meta(field_name, serializer_field):
             elif related_resource == "seasons":
                 label_key = "safra"
             elif related_resource == "counterparties":
-                label_key = "obs"
+                label_key = "contraparte"
         default_lookup = "in"
     elif isinstance(serializer_field, serializers.ListField):
         field_type = "list"
@@ -383,7 +383,7 @@ def _build_mass_import_metadata(resource, config, request):
             elif related_resource == "seasons":
                 merged["labelKey"] = "safra"
             elif related_resource == "counterparties":
-                merged["labelKey"] = "obs"
+                merged["labelKey"] = "contraparte"
 
         merged.update(override)
         fields.append(merged)
