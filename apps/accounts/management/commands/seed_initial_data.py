@@ -33,7 +33,7 @@ class Command(BaseCommand):
         for nome in ["B3", "CME"]:
             Exchange.objects.get_or_create(nome=nome)
 
-        for nome in ["Compra Call", "Venda Put", "Venda Call", "Venda Put", "Venda NDF", "Compra NDF"]:
+        for nome in ["Compra Call", "Venda Put", "Venda Call", "Venda NDF", "Compra NDF"]:
             DerivativeOperationName.objects.get_or_create(nome=nome)
 
         tenant = User.objects.filter(tenant__isnull=False).values_list("tenant", flat=True).first()
