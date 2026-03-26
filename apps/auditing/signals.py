@@ -6,13 +6,13 @@ from .models import Attachment, AuditLog
 from .services import create_audit_log, serialize_instance_for_log
 
 
-def _should_skip(instance):
-    return is_audit_suppressed() or isinstance(instance, (AuditLog, Attachment))
+def _should_skip(instance, raw=False):
+    return raw or is_audit_suppressed() or isinstance(instance, (AuditLog, Attachment))
 
 
 @receiver(pre_save)
-def capture_pre_save_state(sender, instance, **_kwargs):
-    if _should_skip(instance):
+def capture_pre_save_state(sender, instance, raw=False, **_kwargs):
+    if _should_skip(instance, raw=raw):
         return
 
     previous = {}
@@ -27,8 +27,8 @@ def capture_pre_save_state(sender, instance, **_kwargs):
 
 
 @receiver(post_save)
-def create_save_audit_log(sender, instance, created, **_kwargs):
-    if _should_skip(instance):
+def create_save_audit_log(sender, instance, created, raw=False, **_kwargs):
+    if _should_skip(instance, raw=raw):
         return
 
     before = getattr(instance, "_audit_before_state", {})
