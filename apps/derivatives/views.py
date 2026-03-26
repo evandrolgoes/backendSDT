@@ -915,9 +915,9 @@ class DerivativeOperationViewSet(TenantScopedModelViewSet):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def derivative_contracts(request):
-    bolsa = request.GET.get("bolsa") or ""
-    normalized_bolsa = _normalize_derivative_lookup_value(bolsa)
-    if not normalized_bolsa:
+    secao = request.GET.get("secao") or request.GET.get("seção") or request.GET.get("bolsa") or ""
+    normalized_secao = _normalize_derivative_lookup_value(secao)
+    if not normalized_secao:
         return JsonResponse([], safe=False)
 
     url = "https://api.sheety.co/90083751cf0794f44c9730c96a94cedf/apiCotacoesSpotGetBubble/planilha1"
@@ -931,15 +931,14 @@ def derivative_contracts(request):
     options = []
     for row in rows if isinstance(rows, list) else []:
         normalized = {str(key).strip().lower(): value for key, value in row.items()}
-        bolsa_value = (
-            normalized.get("bolsa")
-            or normalized.get("produto/bolsa")
-            or normalized.get("produto_bolsa")
-            or normalized.get("bolsa ref")
-            or normalized.get("bolsa_ref")
+        secao_value = (
+            normalized.get("section_name")
+            or normalized.get("secao")
+            or normalized.get("seção")
+            or normalized.get("section")
             or ""
         )
-        if _normalize_derivative_lookup_value(bolsa_value) != normalized_bolsa:
+        if _normalize_derivative_lookup_value(secao_value) != normalized_secao:
             continue
 
         contract = (
