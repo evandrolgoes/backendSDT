@@ -133,6 +133,7 @@ class CashPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     data_desembolso = models.DateField(null=True, blank=True)
     data_pagamento = models.DateField(null=True, blank=True)
     descricao = models.TextField(blank=True)
+    obs = models.TextField(blank=True)
     contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
 
     class Meta:
