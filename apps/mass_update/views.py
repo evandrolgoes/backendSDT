@@ -242,6 +242,8 @@ def _resolve_field_meta(field_name, serializer_field):
     related_resource = None
     options = None
     default_lookup = "icontains"
+    label_key = None
+    value_key = None
 
     if isinstance(serializer_field, serializers.BooleanField):
         field_type = "boolean"
@@ -266,6 +268,16 @@ def _resolve_field_meta(field_name, serializer_field):
         model = getattr(queryset, "model", None)
         if model is not None:
             related_resource = MODEL_LABEL_TO_RESOURCE.get(model._meta.label)
+            if related_resource == "groups":
+                label_key = "grupo"
+            elif related_resource == "subgroups":
+                label_key = "subgrupo"
+            elif related_resource == "crops":
+                label_key = "ativo"
+            elif related_resource == "seasons":
+                label_key = "safra"
+            elif related_resource == "counterparties":
+                label_key = "obs"
         default_lookup = "exact"
     elif isinstance(serializer_field, serializers.ManyRelatedField):
         field_type = "multirelation"
@@ -274,6 +286,16 @@ def _resolve_field_meta(field_name, serializer_field):
         model = getattr(queryset, "model", None)
         if model is not None:
             related_resource = MODEL_LABEL_TO_RESOURCE.get(model._meta.label)
+            if related_resource == "groups":
+                label_key = "grupo"
+            elif related_resource == "subgroups":
+                label_key = "subgrupo"
+            elif related_resource == "crops":
+                label_key = "ativo"
+            elif related_resource == "seasons":
+                label_key = "safra"
+            elif related_resource == "counterparties":
+                label_key = "obs"
         default_lookup = "in"
     elif isinstance(serializer_field, serializers.ListField):
         field_type = "list"
@@ -285,6 +307,8 @@ def _resolve_field_meta(field_name, serializer_field):
         "required": serializer_field.required,
         "allowNull": getattr(serializer_field, "allow_null", False),
         "relatedResource": related_resource,
+        "labelKey": label_key,
+        "valueKey": value_key,
         "options": options,
         "defaultLookup": default_lookup,
     }
