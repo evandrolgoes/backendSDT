@@ -178,7 +178,7 @@ class CounterpartyViewSet(TenantScopedModelViewSet):
     queryset = Counterparty.objects.select_related("tenant", "grupo", "subgrupo").all()
     serializer_class = CounterpartySerializer
     filterset_fields = ["tenant", "grupo", "subgrupo"]
-    search_fields = ["obs"]
+    search_fields = ["contraparte", "obs"]
 
 
 class BrokerViewSet(TenantScopedModelViewSet):

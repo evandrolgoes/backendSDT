@@ -87,6 +87,7 @@ class CropSeason(TenantAwareModel):
 class Counterparty(TenantAwareModel):
     subgrupo = models.ForeignKey(SubGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="contrapartes")
     grupo = models.ForeignKey(EconomicGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="contrapartes")
+    contraparte = models.CharField(max_length=160, blank=True)
     obs = models.TextField(blank=True)
 
     class Meta:
