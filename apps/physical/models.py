@@ -107,10 +107,12 @@ class PhysicalPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
     fazer_frente_com = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
+    classificacao = models.CharField(max_length=40, blank=True)
     volume = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     unidade = models.CharField(max_length=20, blank=True)
     data_pagamento = models.DateField(null=True, blank=True)
     descricao = models.TextField(blank=True)
+    obs = models.TextField(blank=True)
     contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_fisico")
 
     class Meta:

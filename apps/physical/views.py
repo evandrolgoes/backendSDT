@@ -76,8 +76,8 @@ class PhysicalSaleViewSet(TenantScopedModelViewSet):
 class PhysicalPaymentViewSet(TenantScopedModelViewSet):
     queryset = PhysicalPayment.objects.select_related("tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "created_by").all()
     serializer_class = PhysicalPaymentSerializer
-    filterset_fields = ["tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "unidade", "data_pagamento"]
-    search_fields = ["descricao"]
+    filterset_fields = ["tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "unidade", "classificacao", "data_pagamento"]
+    search_fields = ["descricao", "classificacao", "obs"]
 
 
 class CashPaymentViewSet(TenantScopedModelViewSet):
