@@ -1,6 +1,7 @@
 import json
 import re
 from decimal import Decimal, InvalidOperation
+from traceback import format_exc
 from urllib.error import URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -231,6 +232,10 @@ def _normalize_derivative_lookup_value(value):
 
 def _normalize_import_key(value):
     return str(value or "").strip()
+
+
+def _normalize_import_resource_key(value):
+    return str(value or "").strip().replace("-", "_")
 
 
 def _normalize_source_field(value):
@@ -677,6 +682,33 @@ def _lookup_related_instance(model, tenant, value):
         return None
 
 
+def _resolve_resource_backed_import_value(field_name, raw_value, tenant, warnings):
+    field_config = DERIVATIVE_BULK_SELECT_CONFIG.get(field_name) or {}
+    resource_key = _normalize_import_resource_key(field_config.get("resource"))
+    raw = _normalize_import_key(raw_value)
+    if not resource_key or not raw:
+        return raw
+
+    target_config = IMPORT_TARGETS.get(resource_key)
+    if not target_config:
+        warnings.append(f"Configuracao de recurso nao encontrada para {field_name}.")
+        return raw
+
+    instance = _lookup_related_instance(target_config["model"], tenant, raw)
+    if instance is None:
+        warnings.append(f"Nao foi possivel criar ou localizar o cadastro relacionado de {field_name}: {raw}")
+        return raw
+
+    model_fields = {field.name for field in instance._meta.fields}
+    for candidate in [field_config.get("value_key"), field_config.get("label_key"), "nome", "name", "code"]:
+        if candidate and candidate in model_fields:
+            resolved = getattr(instance, candidate, None)
+            if resolved not in (None, ""):
+                return resolved
+
+    return raw
+
+
 def _split_import_values(raw_value):
     if raw_value in (None, ""):
         return []
@@ -821,6 +853,10 @@ def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
         "volume_fisico_valor",
     }:
         setattr(instance, target_field, _parse_decimal(raw_value))
+        return
+
+    if DERIVATIVE_BULK_SELECT_CONFIG.get(target_field, {}).get("resource"):
+        setattr(instance, target_field, _resolve_resource_backed_import_value(target_field, raw_value, tenant, warnings))
         return
 
     setattr(instance, target_field, _normalize_import_key(raw_value))
@@ -1029,14 +1065,19 @@ def import_bubble_derivatives(request):
         if model is DerivativeOperation and not instance.cod_operacao_mae:
             instance.cod_operacao_mae = import_key
 
-        with suppress_audit_signals():
-            instance.save()
-            for field_name, values in m2m_updates.items():
-                getattr(instance, field_name).set(values)
+        try:
+            with suppress_audit_signals():
+                instance.save()
+                for field_name, values in m2m_updates.items():
+                    getattr(instance, field_name).set(values)
 
-        audit_helper._create_audit_log("criado", instance, before={}, after=audit_helper._serialize_instance_for_log(instance))
-
-        created_count += 1
+            audit_helper._create_audit_log("criado", instance, before={}, after=audit_helper._serialize_instance_for_log(instance))
+            created_count += 1
+        except Exception as exc:
+            skipped_count += 1
+            warnings.append(f"Linha {index}: erro ao salvar registro ({exc}).")
+            print(format_exc())
+            continue
 
         for warning in row_warnings[:5]:
             warnings.append(f"Linha {index}: {warning}")

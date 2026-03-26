@@ -93,7 +93,11 @@ class Counterparty(TenantAwareModel):
         indexes = [models.Index(fields=["tenant", "grupo"])]
 
     def __str__(self):
-        return f"{self.grupo} / {self.subgrupo}"
+        parts = [str(self.grupo).strip() if self.grupo else "", str(self.contraparte).strip(), str(self.obs).strip()]
+        for part in parts:
+            if part:
+                return part
+        return f"Contraparte {self.pk}" if self.pk else "Contraparte"
 
 
 class Broker(TenantAwareModel):
