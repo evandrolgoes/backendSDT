@@ -175,9 +175,9 @@ class CropSeasonViewSet(TenantScopedModelViewSet):
 
 
 class CounterpartyViewSet(TenantScopedModelViewSet):
-    queryset = Counterparty.objects.select_related("tenant", "grupo", "subgrupo").all()
+    queryset = Counterparty.objects.select_related("tenant", "grupo").all()
     serializer_class = CounterpartySerializer
-    filterset_fields = ["tenant", "grupo", "subgrupo"]
+    filterset_fields = ["tenant", "grupo"]
     search_fields = ["contraparte", "obs"]
 
 

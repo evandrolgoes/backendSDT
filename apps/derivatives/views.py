@@ -593,7 +593,7 @@ def _lookup_counterparty(tenant, value):
     existing = Counterparty.objects.filter(
         tenant=tenant
     ).filter(
-        Q(grupo__grupo__iexact=raw) | Q(subgrupo__subgrupo__iexact=raw) | Q(obs__iexact=raw)
+        Q(grupo__grupo__iexact=raw) | Q(contraparte__iexact=raw) | Q(obs__iexact=raw)
     ).first()
     if existing is not None:
         return existing
