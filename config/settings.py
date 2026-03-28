@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "apps.leads",
     "apps.tradingview_scraper",
     "apps.mass_update",
+    "apps.insights",
 ]
 
 MIDDLEWARE = [
@@ -209,6 +210,8 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5174")
 ACCESS_REQUEST_NOTIFY_EMAIL = config("ACCESS_REQUEST_NOTIFY_EMAIL", default="evandrogoes@agrosaldaterra.com.br")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@sdt.local")
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+OPENAI_INSIGHTS_MODEL = config("OPENAI_INSIGHTS_MODEL", default="gpt-5-mini")
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", cast=int, default=25)

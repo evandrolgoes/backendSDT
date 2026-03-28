@@ -43,7 +43,10 @@ def _normalize_locality(value):
 
 def _parse_multi_value_param(request, key):
     values = []
-    for item in request.query_params.getlist(key):
+    raw_items = request.query_params.getlist(key)
+    if not raw_items:
+        raw_items = request.query_params.getlist(f"{key}[]")
+    for item in raw_items:
         if item is None:
             continue
         parts = [part.strip() for part in str(item).split(",")]

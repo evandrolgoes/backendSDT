@@ -47,6 +47,7 @@ from apps.mass_update.copy_base_views import CopyBaseApplyView, CopyBasePreviewV
 from apps.mercado.views import MarketNewsPostViewSet, mercado_health
 from apps.payables.views import AccountsPayableViewSet
 from apps.leads.views import LeadCreateView
+from apps.insights.views import CommercialInsightsView
 from apps.physical.views import (
     ActualCostViewSet,
     BudgetCostViewSet,
@@ -122,6 +123,7 @@ urlpatterns = [
     path("api/mass-import/resources/", MassImportResourcesView.as_view(), name="mass_import_resources"),
     path("api/mass-import/metadata/", MassImportMetadataView.as_view(), name="mass_import_metadata"),
     path("api/mass-import/apply/", MassImportApplyView.as_view(), name="mass_import_apply"),
+    path("api/insights/commercialization/", CommercialInsightsView.as_view(), name="commercial_insights"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/dashboard/commercial-risk-summary/", commercial_risk_summary, name="commercial_risk_summary"),

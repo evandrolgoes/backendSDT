@@ -8,6 +8,7 @@ AVAILABLE_MODULES = [
     ("dashboard_currency_exposure", "Dashboard: Exposicao e Hedge Cambial"),
     ("dashboard_simulations", "Dashboard: Simulacoes"),
     ("dashboard_mtm", "Dashboard: MTM"),
+    ("insights_commercialization", "Insights: Comercializacao"),
     ("market_fund_positions", "Mercado: Posicao de Fundos"),
     ("market_quotes", "Mercado: Cotacoes"),
     ("market_exports", "Mercado: Exportacoes"),
