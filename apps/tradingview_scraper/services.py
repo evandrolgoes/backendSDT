@@ -1,5 +1,6 @@
 import json
 import re
+import threading
 from collections import OrderedDict
 from datetime import timedelta
 from decimal import Decimal
@@ -33,6 +34,8 @@ DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0 Safari/537.36",
     "Accept": "application/json,text/html,application/xhtml+xml",
 }
+_async_refresh_lock = threading.Lock()
+_async_refresh_running = False
 
 
 class TradingViewScraperError(Exception):
@@ -273,6 +276,41 @@ def ensure_watchlist_is_fresh(source_url=DEFAULT_TRADINGVIEW_WATCHLIST_URL, max_
     if latest_sync is None or latest_sync <= timezone.now() - timedelta(minutes=max_age_minutes):
         return sync_watchlist_to_db(source_url)
     return None
+
+
+def trigger_watchlist_refresh_async(source_url=DEFAULT_TRADINGVIEW_WATCHLIST_URL, max_age_minutes=10):
+    global _async_refresh_running
+
+    latest_sync = (
+        TradingViewWatchlistQuote.objects.filter(source_url=source_url)
+        .order_by("-synced_at")
+        .values_list("synced_at", flat=True)
+        .first()
+    )
+    if latest_sync is not None and latest_sync > timezone.now() - timedelta(minutes=max_age_minutes):
+        return False
+
+    with _async_refresh_lock:
+        if _async_refresh_running:
+            return False
+        _async_refresh_running = True
+
+    def runner():
+        global _async_refresh_running
+        try:
+            sync_watchlist_to_db(source_url)
+        except Exception:
+            pass
+        finally:
+            with _async_refresh_lock:
+                _async_refresh_running = False
+
+    threading.Thread(
+        target=runner,
+        name="tradingview-on-demand-refresh",
+        daemon=True,
+    ).start()
+    return True
 
 
 def parse_watchlist_id_from_url(source_url):

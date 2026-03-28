@@ -56,7 +56,7 @@ from apps.physical.views import (
     PhysicalSaleViewSet,
 )
 from apps.receivables.views import ReceiptEntryViewSet
-from apps.risk.views import ExposurePositionViewSet
+from apps.risk.views import ExposurePositionViewSet, commercial_risk_summary
 from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
 from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
 
@@ -124,6 +124,7 @@ urlpatterns = [
     path("api/mass-import/apply/", MassImportApplyView.as_view(), name="mass_import_apply"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
+    path("api/dashboard/commercial-risk-summary/", commercial_risk_summary, name="commercial_risk_summary"),
     path("api/auth/login/", LoginView.as_view(), name="login"),
     path("api/auth/impersonate/<int:user_id>/", ImpersonateUserView.as_view(), name="impersonate_user"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
