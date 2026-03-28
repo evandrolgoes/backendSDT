@@ -80,6 +80,7 @@ class User(AbstractUser):
     assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="assigned_users")
     assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="assigned_users")
     allowed_modules = models.JSONField(default=list, blank=True, null=True)
+    dashboard_filter = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()
@@ -160,7 +161,10 @@ class User(AbstractUser):
         if self.has_tenant_slug("admin"):
             return list(Tenant.objects.values_list("id", flat=True))
         if self.has_tenant_slug("usuario") and self.master_user_id and self.master_user.tenant_id:
-            return [self.master_user.tenant_id]
+            tenant_ids = {self.master_user.tenant_id}
+            tenant_ids.update(self.assigned_groups.values_list("tenant_id", flat=True))
+            tenant_ids.update(self.assigned_subgroups.values_list("tenant_id", flat=True))
+            return [tenant_id for tenant_id in tenant_ids if tenant_id]
         return [self.tenant_id]
 
     def get_master_root(self):

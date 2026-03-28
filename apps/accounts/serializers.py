@@ -88,6 +88,7 @@ class UserSerializer(serializers.ModelSerializer):
     master_user_name = serializers.CharField(source="master_user.full_name", read_only=True)
     master_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
     effective_modules = serializers.SerializerMethodField()
+    dashboard_filter = serializers.JSONField(required=False)
 
     def get_fields(self):
         fields = super().get_fields()
@@ -138,6 +139,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "is_superuser",
             "effective_modules",
+            "dashboard_filter",
             "password",
             "created_at",
         ]
@@ -214,6 +216,28 @@ class UserSerializer(serializers.ModelSerializer):
             else:
                 attrs["master_user"] = None
         return attrs
+
+
+class DashboardFilterSerializer(serializers.Serializer):
+    grupo = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    subgrupo = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    cultura = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    safra = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    localidade = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+
+    def to_representation(self, instance):
+        data = instance if isinstance(instance, dict) else {}
+        return {
+            "grupo": [str(item) for item in (data.get("grupo") or []) if item not in (None, "")],
+            "subgrupo": [str(item) for item in (data.get("subgrupo") or []) if item not in (None, "")],
+            "cultura": [str(item) for item in (data.get("cultura") or []) if item not in (None, "")],
+            "safra": [str(item) for item in (data.get("safra") or []) if item not in (None, "")],
+            "localidade": [str(item) for item in (data.get("localidade") or []) if item not in (None, "")],
+        }
+
+    def validate(self, attrs):
+        normalized = self.to_representation(attrs)
+        return normalized
 
 
 class BaseInvitationSerializer(serializers.ModelSerializer):

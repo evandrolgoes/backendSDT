@@ -11,6 +11,7 @@ from apps.anotacoes.views import AnotacaoViewSet, anotacoes_health
 from apps.accounts.views import (
     AccessRequestView,
     AdminInvitationViewSet,
+    DashboardFilterView,
     ForgotPasswordView,
     InvitationAcceptView,
     InvitationDetailByTokenView,
@@ -42,6 +43,7 @@ from apps.mass_update.views import (
     MassUpdatePreviewView,
     MassUpdateResourcesView,
 )
+from apps.mass_update.copy_base_views import CopyBaseApplyView, CopyBasePreviewView, CopyBaseTargetsView
 from apps.mercado.views import MarketNewsPostViewSet, mercado_health
 from apps.payables.views import AccountsPayableViewSet
 from apps.leads.views import LeadCreateView
@@ -110,6 +112,9 @@ urlpatterns = [
     path("api/import-tools/bubble/targets/", import_bubble_targets, name="import_bubble_targets"),
     path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),
     path("api/import-tools/bubble/derivatives/", import_bubble_derivatives, name="import_bubble_derivatives"),
+    path("api/copy-base/targets/", CopyBaseTargetsView.as_view(), name="copy_base_targets"),
+    path("api/copy-base/preview/", CopyBasePreviewView.as_view(), name="copy_base_preview"),
+    path("api/copy-base/apply/", CopyBaseApplyView.as_view(), name="copy_base_apply"),
     path("api/mass-update/resources/", MassUpdateResourcesView.as_view(), name="mass_update_resources"),
     path("api/mass-update/metadata/", MassUpdateMetadataView.as_view(), name="mass_update_metadata"),
     path("api/mass-update/preview/", MassUpdatePreviewView.as_view(), name="mass_update_preview"),
@@ -123,6 +128,7 @@ urlpatterns = [
     path("api/auth/impersonate/<int:user_id>/", ImpersonateUserView.as_view(), name="impersonate_user"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/me/", me, name="me"),
+    path("api/auth/dashboard-filter/", DashboardFilterView.as_view(), name="dashboard_filter"),
     path("api/auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
     path("api/auth/reset-password-confirm/", ResetPasswordConfirmView.as_view(), name="reset_password_confirm"),
     path("api/auth/request-access/", AccessRequestView.as_view(), name="request_access"),

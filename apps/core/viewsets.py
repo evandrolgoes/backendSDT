@@ -81,13 +81,39 @@ class TenantScopedModelViewSet(viewsets.ModelViewSet):
                 queries.append(Q(**{f"{field_name}_id__in": allowed_ids}))
         return queries
 
+    def _get_allowed_assignment_ids(self, user):
+        from apps.clients.models import EconomicGroup, SubGroup
+
+        if not getattr(user, "is_authenticated", False):
+            return [], []
+
+        accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
+
+        group_queryset = EconomicGroup.objects.all()
+        subgroup_queryset = SubGroup.objects.all()
+
+        if accessible_tenant_ids:
+            group_queryset = group_queryset.filter(tenant_id__in=accessible_tenant_ids)
+            subgroup_queryset = subgroup_queryset.filter(tenant_id__in=accessible_tenant_ids)
+
+        accessible_group_ids = set(getattr(user, "assigned_groups").values_list("id", flat=True))
+        accessible_subgroup_ids = set(getattr(user, "assigned_subgroups").values_list("id", flat=True))
+
+        accessible_group_ids.update(
+            group_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True)
+        )
+        accessible_subgroup_ids.update(
+            subgroup_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True)
+        )
+
+        return list(accessible_group_ids), list(accessible_subgroup_ids)
+
     def _filter_queryset_by_assignments(self, queryset, user):
         if getattr(user, "is_distributor_admin", lambda: False)() or getattr(user, "has_tenant_slug", lambda *args: False)("admin"):
             return queryset
 
         model = queryset.model
-        allowed_group_ids = list(user.assigned_groups.values_list("id", flat=True))
-        allowed_subgroup_ids = list(user.assigned_subgroups.values_list("id", flat=True))
+        allowed_group_ids, allowed_subgroup_ids = self._get_allowed_assignment_ids(user)
 
         if model._meta.label == "clients.EconomicGroup":
             return queryset.filter(id__in=allowed_group_ids) if allowed_group_ids else queryset.none()

@@ -17,6 +17,7 @@ from .models import Invitation, Tenant, User
 from .serializers import (
     AccessRequestSerializer,
     AdminInvitationSerializer,
+    DashboardFilterSerializer,
     ForgotPasswordSerializer,
     InvitationAcceptSerializer,
     InvitationLookupSerializer,
@@ -51,6 +52,21 @@ class LoginView(TokenObtainPairView):
 @permission_classes([permissions.IsAuthenticated])
 def me(request):
     return response.Response(UserSerializer(request.user, context={"request": request}).data)
+
+
+class DashboardFilterView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        serializer = DashboardFilterSerializer(request.user.dashboard_filter or {})
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        serializer = DashboardFilterSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        request.user.dashboard_filter = serializer.validated_data
+        request.user.save(update_fields=["dashboard_filter"])
+        return response.Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
 class ForgotPasswordView(APIView):

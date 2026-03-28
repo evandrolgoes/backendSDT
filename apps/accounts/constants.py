@@ -43,6 +43,7 @@ AVAILABLE_MODULES = [
     ("sys_accounts_payable", "Sistema: Contas a Pagar"),
     ("sys_logs", "Sistema: Logs"),
     ("sys_json_import", "Sistema: Importador JSON"),
+    ("sys_copy_base", "Sistema: Copy Base"),
     ("sys_mass_update", "Sistema: Alteracao em Massa"),
 ]
 
