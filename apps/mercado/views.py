@@ -75,13 +75,12 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
 
         files = request.FILES.getlist("files")
         created = [
-            Attachment.objects.create(
+            Attachment.create_from_upload(
                 tenant=instance.tenant,
                 uploaded_by=request.user,
                 content_type=content_type,
                 object_id=instance.pk,
-                file=uploaded_file,
-                original_name=uploaded_file.name,
+                uploaded_file=uploaded_file,
             )
             for uploaded_file in files
         ]

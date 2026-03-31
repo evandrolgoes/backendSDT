@@ -22,7 +22,7 @@ from apps.accounts.views import (
     UserViewSet,
     me,
 )
-from apps.auditing.views import AttachmentViewSet, AuditLogViewSet
+from apps.auditing.views import AttachmentViewSet, AuditLogViewSet, attachment_content
 from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperationNameViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
 from apps.derivatives.views import (
@@ -138,6 +138,7 @@ urlpatterns = [
     path("api/auth/invitations/<str:token>/", InvitationDetailByTokenView.as_view(), name="invitation_detail_by_token"),
     path("api/auth/invitations/<str:token>/accept/", InvitationAcceptView.as_view(), name="invitation_accept"),
     path("api/leads/", LeadCreateView.as_view(), name="lead_create"),
+    path("api/attachments/content/<int:attachment_id>/", attachment_content, name="attachment_content"),
     re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
 ]
 

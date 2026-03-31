@@ -1,5 +1,10 @@
+from io import BytesIO
+
+from django.http import FileResponse, Http404
 from apps.core.viewsets import TenantScopedModelViewSet
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
 from .models import Attachment, AuditLog
 from .serializers import AttachmentSerializer, AuditLogSerializer
@@ -39,4 +44,43 @@ class AttachmentViewSet(TenantScopedModelViewSet):
         extra = {"uploaded_by": self.request.user}
         if not self.request.user.is_superuser:
             extra["tenant"] = self.request.user.tenant
-        serializer.save(**extra)
+        uploaded_file = serializer.validated_data.pop("file", None)
+        attachment = serializer.save(**extra)
+        if uploaded_file is not None:
+            attachment.store_uploaded_file(uploaded_file)
+            attachment.save(update_fields=["file", "file_blob", "stored_content_type", "stored_size", "original_name"])
+
+
+@api_view(["GET", "HEAD"])
+@permission_classes([AllowAny])
+def attachment_content(request, attachment_id):
+    attachment = Attachment.objects.filter(pk=attachment_id).first()
+    if not attachment:
+        raise Http404("Attachment not found.")
+
+    if attachment.file_blob:
+        response = FileResponse(
+            BytesIO(attachment.file_blob),
+            content_type=attachment.stored_content_type or "application/octet-stream",
+            as_attachment=False,
+            filename=attachment.original_name,
+        )
+        response["Content-Length"] = str(attachment.stored_size or len(attachment.file_blob))
+        return response
+
+    if attachment.file:
+        try:
+            file_handle = attachment.file.open("rb")
+        except FileNotFoundError as exc:
+            raise Http404("Attachment file not found.") from exc
+        response = FileResponse(
+            file_handle,
+            content_type=attachment.stored_content_type or "application/octet-stream",
+            as_attachment=False,
+            filename=attachment.original_name,
+        )
+        if attachment.stored_size:
+            response["Content-Length"] = str(attachment.stored_size)
+        return response
+
+    raise Http404("Attachment has no content.")

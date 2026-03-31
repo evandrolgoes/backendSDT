@@ -908,21 +908,20 @@ class DerivativeOperationViewSet(TenantScopedModelViewSet):
         ).order_by("-created_at")
 
         if request.method == "GET":
-            return Response(AttachmentSerializer(queryset, many=True).data)
+            return Response(AttachmentSerializer(queryset, many=True, context={"request": request}).data)
 
         files = request.FILES.getlist("files")
         created = [
-            Attachment.objects.create(
+            Attachment.create_from_upload(
                 tenant=instance.tenant,
                 uploaded_by=request.user,
                 content_type=content_type,
                 object_id=instance.pk,
-                file=uploaded_file,
-                original_name=uploaded_file.name,
+                uploaded_file=uploaded_file,
             )
             for uploaded_file in files
         ]
-        return Response(AttachmentSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
+        return Response(AttachmentSerializer(created, many=True, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])

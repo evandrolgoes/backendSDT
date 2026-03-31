@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
+from django.urls import reverse
 
 from .models import Attachment, AuditLog
 
@@ -29,16 +30,19 @@ class AttachmentSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
 
     def get_file_url(self, obj):
+        request = self.context.get("request")
+        if getattr(obj, "file_blob", None):
+            url = reverse("attachment_content", kwargs={"attachment_id": obj.pk})
+            return request.build_absolute_uri(url) if request else url
         if not getattr(obj, "file", None):
             return ""
         try:
             url = obj.file.url
         except ValueError:
             return ""
-        request = self.context.get("request")
         return request.build_absolute_uri(url) if request else url
 
     class Meta:
         model = Attachment
         fields = "__all__"
-        read_only_fields = ["created_at", "updated_at", "uploaded_by"]
+        read_only_fields = ["created_at", "updated_at", "uploaded_by", "file_blob", "stored_content_type", "stored_size"]
