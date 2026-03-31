@@ -11,7 +11,7 @@ from apps.auditing.serializers import AttachmentSerializer
 from apps.core.viewsets import TenantScopedModelViewSet
 
 from .models import MarketNewsPost
-from .serializers import MarketNewsPostSerializer
+from .serializers import MarketNewsPostListSerializer, MarketNewsPostSerializer
 
 
 def mercado_health(_request):
@@ -24,14 +24,22 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
     filterset_fields = ["status_artigo", "published_by"]
     search_fields = ["titulo", "categorias", "conteudo_html"]
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return MarketNewsPostListSerializer
+        return super().get_serializer_class()
+
     def get_queryset(self):
         queryset = super().get_queryset()
         user = getattr(self.request, "user", None)
         if not user or not user.is_authenticated:
-            return queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
-        if user.is_superuser or user.is_tenant_admin():
-            return queryset
-        return queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
+            queryset = queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
+        elif not (user.is_superuser or user.is_tenant_admin()):
+            queryset = queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
+
+        if self.action in {"list", "categories"}:
+            queryset = queryset.defer("conteudo_html")
+        return queryset
 
     def _build_save_kwargs(self, serializer):
         save_kwargs = {}
@@ -93,7 +101,7 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
     def categories(self, request):
         names = []
         seen = set()
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.filter_queryset(self.get_queryset()).only("id", "categorias")
         for post in queryset.iterator():
             for item in getattr(post, "categorias", []) or []:
                 normalized = str(item or "").strip()

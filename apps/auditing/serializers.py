@@ -44,5 +44,18 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Attachment
-        fields = "__all__"
-        read_only_fields = ["created_at", "updated_at", "uploaded_by", "file_blob", "stored_content_type", "stored_size"]
+        fields = [
+            "id",
+            "tenant",
+            "uploaded_by",
+            "content_type",
+            "object_id",
+            "file",
+            "original_name",
+            "created_at",
+            "updated_at",
+            "file_url",
+            "stored_content_type",
+            "stored_size",
+        ]
+        read_only_fields = ["created_at", "updated_at", "uploaded_by", "stored_content_type", "stored_size", "file_url"]

@@ -1,4 +1,5 @@
 import json
+import re
 
 from rest_framework import serializers
 
@@ -20,6 +21,14 @@ class CategoryListField(serializers.ListField):
                 except json.JSONDecodeError:
                     data = [item.strip() for item in raw.split(",") if item.strip()]
         return super().to_internal_value(data)
+
+
+def build_html_excerpt(value, max_length=220):
+    plain_text = re.sub(r"<style[\s\S]*?</style>|<script[\s\S]*?</script>|<[^>]+>", " ", str(value or ""), flags=re.IGNORECASE)
+    plain_text = re.sub(r"\s+", " ", plain_text).strip()
+    if len(plain_text) <= max_length:
+        return plain_text
+    return f"{plain_text[: max_length - 3].rstrip()}..."
 
 
 class MarketNewsPostSerializer(serializers.ModelSerializer):
@@ -69,3 +78,40 @@ class MarketNewsPostSerializer(serializers.ModelSerializer):
             instance.audio.delete(save=False)
             instance.audio = None
         return super().update(instance, validated_data)
+
+
+class MarketNewsPostListSerializer(serializers.ModelSerializer):
+    published_by_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    excerpt = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MarketNewsPost
+        fields = [
+            "id",
+            "titulo",
+            "categorias",
+            "status_artigo",
+            "data_publicacao",
+            "published_by_name",
+            "created_by_name",
+            "created_at",
+            "updated_at",
+            "audio",
+            "excerpt",
+        ]
+
+    def get_published_by_name(self, obj):
+        user = getattr(obj, "published_by", None)
+        if not user:
+            return ""
+        return getattr(user, "full_name", "") or getattr(user, "username", "") or getattr(user, "email", "")
+
+    def get_created_by_name(self, obj):
+        user = getattr(obj, "created_by", None)
+        if not user:
+            return ""
+        return getattr(user, "full_name", "") or getattr(user, "username", "") or getattr(user, "email", "")
+
+    def get_excerpt(self, obj):
+        return build_html_excerpt(getattr(obj, "conteudo_html", ""))
