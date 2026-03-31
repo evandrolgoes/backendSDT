@@ -71,7 +71,7 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
         ).order_by("-created_at")
 
         if request.method == "GET":
-            return Response(AttachmentSerializer(queryset, many=True).data)
+            return Response(AttachmentSerializer(queryset, many=True, context={"request": request}).data)
 
         files = request.FILES.getlist("files")
         created = [
@@ -85,7 +85,10 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
             )
             for uploaded_file in files
         ]
-        return Response(AttachmentSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
+        return Response(
+            AttachmentSerializer(created, many=True, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=False, methods=["get"], url_path="categories")
     def categories(self, request):
