@@ -558,6 +558,10 @@ def _lookup_group(tenant, value):
 
 
 def _lookup_subgroup(tenant, value):
+    return _lookup_subgroup_for_group(tenant, value, None)
+
+
+def _lookup_subgroup_for_group(tenant, value, group):
     raw = _normalize_import_key(value)
     if not raw:
         return None
@@ -565,10 +569,17 @@ def _lookup_subgroup(tenant, value):
         existing = SubGroup.objects.filter(tenant=tenant, pk=int(raw)).first()
         if existing is not None:
             return existing
-    existing = SubGroup.objects.filter(tenant=tenant, subgrupo__iexact=raw).first()
+    queryset = SubGroup.objects.filter(tenant=tenant, subgrupo__iexact=raw)
+    if group is not None:
+        existing = queryset.filter(grupo=group).first()
+        if existing is not None:
+            return existing
+    existing = queryset.first()
     if existing is not None:
         return existing
-    return SubGroup.objects.create(tenant=tenant, subgrupo=raw)
+    if group is None:
+        return None
+    return SubGroup.objects.create(tenant=tenant, grupo=group, subgrupo=raw)
 
 
 def _lookup_crop(value):
@@ -806,10 +817,12 @@ def _apply_mapped_value(instance, target_field, raw_value, tenant, warnings):
         return
 
     if target_field == "subgrupo":
-        resolved = _lookup_subgroup(tenant, raw_value)
+        resolved = _lookup_subgroup_for_group(tenant, raw_value, getattr(instance, "grupo", None))
         if resolved is None and raw_value not in (None, ""):
-            warnings.append(f"Subgrupo nao encontrado: {raw_value}")
+            warnings.append(f"Subgrupo nao encontrado ou sem grupo pai definido: {raw_value}")
         instance.subgrupo = resolved
+        if resolved is not None and getattr(instance, "grupo_id", None) is None:
+            instance.grupo = resolved.grupo
         return
 
     if target_field == "ativo":

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.core.group_access import resolve_group_subgroup_collections
 from apps.clients.models import EconomicGroup, SubGroup
 
 from .models import Anotacao
@@ -48,6 +49,10 @@ class AnotacaoSerializer(serializers.ModelSerializer):
             if invalid:
                 raise serializers.ValidationError({field_name: "Todos os relacionamentos precisam pertencer ao mesmo tenant."})
 
+        groups = attrs.get("grupos", self.instance.grupos.all() if self.instance else [])
+        subgroups = attrs.get("subgrupos", self.instance.subgrupos.all() if self.instance else [])
+        attrs["grupos"] = resolve_group_subgroup_collections(groups, subgroups)
+
         return attrs
 
     def get_grupos_display(self, obj):
@@ -66,4 +71,3 @@ class AnotacaoSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         return self._user_display(getattr(obj, "created_by", None))
-

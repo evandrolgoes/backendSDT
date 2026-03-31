@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
@@ -67,6 +68,10 @@ class User(AbstractUser):
         PENDING = "pending", "Pendente"
         ACTIVE = "active", "Ativo"
 
+    class ScopeAccessLevel(models.TextChoices):
+        READ = "read", "Leitura"
+        WRITE = "write", "Edicao"
+
     tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.SET_NULL, related_name="users")
     master_user = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="managed_users")
     email = models.EmailField(unique=True)
@@ -77,6 +82,7 @@ class User(AbstractUser):
     max_admin_invitations = models.PositiveIntegerField(null=True, blank=True)
     max_owned_groups = models.PositiveIntegerField(null=True, blank=True)
     max_owned_subgroups = models.PositiveIntegerField(null=True, blank=True)
+    scope_access_level = models.CharField(max_length=20, choices=ScopeAccessLevel.choices, default=ScopeAccessLevel.READ)
     assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="assigned_users")
     assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="assigned_users")
     allowed_modules = models.JSONField(default=list, blank=True, null=True)
@@ -161,10 +167,7 @@ class User(AbstractUser):
         if self.has_tenant_slug("admin"):
             return list(Tenant.objects.values_list("id", flat=True))
         if self.has_tenant_slug("usuario") and self.master_user_id and self.master_user.tenant_id:
-            tenant_ids = {self.master_user.tenant_id}
-            tenant_ids.update(self.assigned_groups.values_list("tenant_id", flat=True))
-            tenant_ids.update(self.assigned_subgroups.values_list("tenant_id", flat=True))
-            return [tenant_id for tenant_id in tenant_ids if tenant_id]
+            return [tenant_id for tenant_id in {self.tenant_id, self.master_user.tenant_id} if tenant_id]
         return [self.tenant_id]
 
     def get_master_root(self):
@@ -190,7 +193,6 @@ class User(AbstractUser):
 
 class Invitation(TimeStampedModel):
     class Kind(models.TextChoices):
-        INTERNAL_USER = "internal_user", "Convite interno"
         FARM_OWNER = "farm_owner", "Owner da fazenda"
         DISTRIBUTOR = "distributor", "Distribuidor"
         PLATFORM_ADMIN = "platform_admin", "Usuario admin"
@@ -201,19 +203,24 @@ class Invitation(TimeStampedModel):
         EXPIRED = "expired", "Expirado"
 
     tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.CASCADE, related_name="invitations")
-    kind = models.CharField(max_length=30, choices=Kind.choices, default=Kind.INTERNAL_USER)
+    kind = models.CharField(max_length=30, choices=Kind.choices, default=Kind.PLATFORM_ADMIN)
     token = models.CharField(max_length=64, unique=True, blank=True)
     target_tenant_name = models.CharField(max_length=150, blank=True)
     target_tenant_slug = models.SlugField(blank=True)
+    username = models.CharField(max_length=150, blank=True)
     full_name = models.CharField(max_length=150, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=30, blank=True)
+    access_status = models.CharField(max_length=20, choices=User.AccessStatus.choices, default=User.AccessStatus.ACTIVE)
+    max_admin_invitations = models.PositiveIntegerField(null=True, blank=True)
     assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="invitations")
     assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="invitations")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     message = models.TextField(blank=True)
     expires_at = models.DateField(null=True, blank=True)
+    scope_access_level = models.CharField(max_length=20, choices=User.ScopeAccessLevel.choices, default=User.ScopeAccessLevel.READ)
     invited_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="sent_invitations")
+    master_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="managed_invitations")
     accepted_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="accepted_invitations")
 
     class Meta:

@@ -1,9 +1,9 @@
 from django.db.models import Q
+from functools import reduce
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.clients.models import EconomicGroup, SubGroup
 from apps.core.viewsets import TenantScopedModelViewSet
 from apps.derivatives.models import DerivativeOperation
 from apps.mercado.models import MarketNewsPost
@@ -54,26 +54,6 @@ def _parse_multi_value_param(request, key):
     return values
 
 
-def _get_allowed_assignment_ids(user):
-    if not getattr(user, "is_authenticated", False):
-        return [], []
-
-    accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
-
-    group_queryset = EconomicGroup.objects.all()
-    subgroup_queryset = SubGroup.objects.all()
-    if accessible_tenant_ids:
-        group_queryset = group_queryset.filter(tenant_id__in=accessible_tenant_ids)
-        subgroup_queryset = subgroup_queryset.filter(tenant_id__in=accessible_tenant_ids)
-
-    accessible_group_ids = set(getattr(user, "assigned_groups").values_list("id", flat=True))
-    accessible_subgroup_ids = set(getattr(user, "assigned_subgroups").values_list("id", flat=True))
-
-    accessible_group_ids.update(group_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True))
-    accessible_subgroup_ids.update(subgroup_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True))
-    return list(accessible_group_ids), list(accessible_subgroup_ids)
-
-
 def _scope_queryset(queryset, user, group_fields=(), subgroup_fields=()):
     if user.is_superuser:
         return queryset
@@ -81,32 +61,6 @@ def _scope_queryset(queryset, user, group_fields=(), subgroup_fields=()):
     accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
     if hasattr(queryset.model, "tenant_id"):
         queryset = queryset.filter(tenant_id__in=accessible_tenant_ids)
-
-    if getattr(user, "is_distributor_admin", lambda: False)() or getattr(user, "has_tenant_slug", lambda *args: False)("admin"):
-        return queryset.distinct()
-
-    allowed_group_ids, allowed_subgroup_ids = _get_allowed_assignment_ids(user)
-    predicates = Q()
-    has_predicate = False
-
-    for field_name in group_fields:
-        if allowed_group_ids:
-            field = queryset.model._meta.get_field(field_name)
-            lookup = f"{field_name}__id__in" if getattr(field, "many_to_many", False) else f"{field_name}_id__in"
-            predicates |= Q(**{lookup: allowed_group_ids})
-            has_predicate = True
-
-    for field_name in subgroup_fields:
-        if allowed_subgroup_ids:
-            field = queryset.model._meta.get_field(field_name)
-            lookup = f"{field_name}__id__in" if getattr(field, "many_to_many", False) else f"{field_name}_id__in"
-            predicates |= Q(**{lookup: allowed_subgroup_ids})
-            has_predicate = True
-
-    if group_fields or subgroup_fields:
-        if not has_predicate:
-            return queryset.none()
-        queryset = queryset.filter(predicates)
 
     return queryset.distinct()
 

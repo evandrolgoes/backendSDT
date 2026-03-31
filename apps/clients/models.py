@@ -50,6 +50,11 @@ class EconomicGroup(TenantAwareModel):
 
 
 class SubGroup(TenantAwareModel):
+    grupo = models.ForeignKey(
+        EconomicGroup,
+        on_delete=models.CASCADE,
+        related_name="subgrupos",
+    )
     subgrupo = models.CharField(max_length=120, null=True, blank=True)
     descricao = models.TextField(blank=True)
     owner = models.ForeignKey(
@@ -66,8 +71,8 @@ class SubGroup(TenantAwareModel):
     )
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["tenant", "subgrupo"], name="uq_subgroup_name_tenant")]
-        indexes = [models.Index(fields=["tenant", "subgrupo"])]
+        constraints = [models.UniqueConstraint(fields=["tenant", "grupo", "subgrupo"], name="uq_subgroup_name_group")]
+        indexes = [models.Index(fields=["tenant", "grupo"]), models.Index(fields=["tenant", "subgrupo"])]
 
     def __str__(self):
         return self.subgrupo

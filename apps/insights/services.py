@@ -1,12 +1,10 @@
 import json
 from collections import defaultdict
 from datetime import timedelta
-
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.clients.models import EconomicGroup, SubGroup
 from apps.derivatives.models import DerivativeOperation
 from apps.mercado.models import MarketNewsPost
 from apps.physical.models import BudgetCost, CashPayment, PhysicalPayment, PhysicalSale
@@ -57,25 +55,6 @@ def _normalize_policy_ratio(value):
     return parsed / 100 if parsed > 1.5 else parsed
 
 
-def _get_allowed_assignment_ids(user):
-    if not getattr(user, "is_authenticated", False):
-        return [], []
-
-    accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
-
-    group_queryset = EconomicGroup.objects.all()
-    subgroup_queryset = SubGroup.objects.all()
-    if accessible_tenant_ids:
-        group_queryset = group_queryset.filter(tenant_id__in=accessible_tenant_ids)
-        subgroup_queryset = subgroup_queryset.filter(tenant_id__in=accessible_tenant_ids)
-
-    accessible_group_ids = set(getattr(user, "assigned_groups").values_list("id", flat=True))
-    accessible_subgroup_ids = set(getattr(user, "assigned_subgroups").values_list("id", flat=True))
-    accessible_group_ids.update(group_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True))
-    accessible_subgroup_ids.update(subgroup_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True))
-    return list(accessible_group_ids), list(accessible_subgroup_ids)
-
-
 def _scope_queryset(queryset, user, group_fields=(), subgroup_fields=()):
     if user.is_superuser:
         return queryset
@@ -83,32 +62,6 @@ def _scope_queryset(queryset, user, group_fields=(), subgroup_fields=()):
     accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
     if hasattr(queryset.model, "tenant_id"):
         queryset = queryset.filter(tenant_id__in=accessible_tenant_ids)
-
-    if getattr(user, "is_distributor_admin", lambda: False)() or getattr(user, "has_tenant_slug", lambda *args: False)("admin"):
-        return queryset.distinct()
-
-    allowed_group_ids, allowed_subgroup_ids = _get_allowed_assignment_ids(user)
-    predicates = Q()
-    has_predicate = False
-
-    for field_name in group_fields:
-        if allowed_group_ids:
-            field = queryset.model._meta.get_field(field_name)
-            lookup = f"{field_name}__id__in" if getattr(field, "many_to_many", False) else f"{field_name}_id__in"
-            predicates |= Q(**{lookup: allowed_group_ids})
-            has_predicate = True
-
-    for field_name in subgroup_fields:
-        if allowed_subgroup_ids:
-            field = queryset.model._meta.get_field(field_name)
-            lookup = f"{field_name}__id__in" if getattr(field, "many_to_many", False) else f"{field_name}_id__in"
-            predicates |= Q(**{lookup: allowed_subgroup_ids})
-            has_predicate = True
-
-    if group_fields or subgroup_fields:
-        if not has_predicate:
-            return queryset.none()
-        queryset = queryset.filter(predicates)
 
     return queryset.distinct()
 
@@ -563,6 +516,132 @@ def _build_written_cards(payload, local_insights):
     )
 
     return cards
+
+
+def _build_question_lab(payload, local_insights):
+    metrics = payload["metrics"]
+    operations = payload["operations"]
+    data_quality = payload["data_quality"]
+    top_cultures = payload["tables"]["top_cultures"]
+    upcoming_maturities = payload["tables"]["upcoming_maturities"]
+
+    coverage_ratio = metrics.get("commercialization_coverage_ratio", 0)
+    uncovered_volume = metrics.get("uncovered_volume_sc", 0)
+    floor_gap = metrics.get("volume_to_policy_floor_sc", 0)
+    net_production = metrics.get("net_production_sc", 0)
+    commercialized_volume = metrics.get("commercialized_volume_sc", 0)
+    policy_min_ratio = metrics.get("policy_min_ratio")
+
+    open_sales_bullets = [
+        f"Produção líquida considerada: {_format_sc(net_production)}.",
+        f"Volume já comercializado/protegido: {_format_sc(commercialized_volume)}.",
+        f"Cobertura atual: {_format_pct(coverage_ratio)}% da produção líquida.",
+    ]
+    if floor_gap > 0:
+        open_sales_bullets.append(f"Faltam {_format_sc(floor_gap)} para atingir o piso da política ativa.")
+    if top_cultures:
+        open_sales_bullets.append(
+            f"Ativo que mais pesa no saldo aberto: {top_cultures[0]['label']} com {_format_sc(top_cultures[0]['uncovered_volume_sc'])} ainda sem cobertura."
+        )
+    open_sales_summary = (
+        f"Ainda faltam aproximadamente {_format_sc(uncovered_volume)} para fixar ou proteger frente à produção líquida do filtro atual."
+        if uncovered_volume > 0
+        else "No filtro atual, não há saldo aberto relevante entre produção líquida e posição já comercializada/protegida."
+    )
+    if policy_min_ratio is None:
+        open_sales_summary += " Não há política ativa suficiente no recorte para comparar esse saldo com um piso formal."
+    elif floor_gap <= 0:
+        open_sales_summary += " O piso da política já está atendido neste recorte."
+
+    near_titles = []
+    for item in upcoming_maturities[:4]:
+        near_titles.append(f"{item['type']}: {item['title']} em {item['date']}.")
+    expiring_bills_summary = (
+        f"Há {operations['upcoming_7d_count']} eventos nos próximos 7 dias e {operations['upcoming_30d_count']} nos próximos 30 dias com potencial de pressionar caixa ou execução."
+        if operations["upcoming_30d_count"] > 0
+        else "Não há vencimentos relevantes nos próximos 30 dias dentro do filtro atual."
+    )
+    expiring_bills_bullets = [
+        f"Vendas físicas próximas: {operations['physical_sales_30d_count']}.",
+        f"Pagamentos físicos próximos: {operations['physical_payments_30d_count']}.",
+        f"Pagamentos de caixa próximos: {operations['cash_payments_30d_count']}.",
+        f"Derivativos com liquidação próxima: {operations['derivatives_30d_count']}.",
+    ] + near_titles
+
+    missing_sources = [item for item in data_quality["sources"] if item["status"] == "missing"]
+    available_sources = [item for item in data_quality["sources"] if item["status"] == "ok"]
+    forms_gap_summary = (
+        f"Existem {len(missing_sources)} base(s) sem registros no filtro atual, o que reduz a confiança da leitura consolidada."
+        if missing_sources
+        else "As principais bases do Insights têm registros no filtro atual, então a leitura está mais completa."
+    )
+    forms_gap_bullets = [
+        f"Sem base em: {', '.join(item['label'] for item in missing_sources)}."
+        if missing_sources
+        else "Nenhuma frente crítica apareceu zerada neste filtro."
+    ]
+    if available_sources:
+        available_labels = ", ".join([f"{item['label']} ({item['count']})" for item in available_sources[:4]])
+        forms_gap_bullets.append(
+            f"Com base disponível em: {available_labels}."
+        )
+
+    priority_bullets = []
+    for item in local_insights.get("bullets", [])[:2]:
+        priority_bullets.append(item)
+    for item in local_insights.get("recommended_actions", [])[:2]:
+        priority_bullets.append(item)
+    for item in local_insights.get("warnings", [])[:2]:
+        priority_bullets.append(item)
+    if not priority_bullets:
+        priority_bullets.append("Sem alertas adicionais relevantes no filtro atual.")
+
+    return [
+        {
+            "id": "open-sales",
+            "title": "Quanto ainda falta fixar nas vendas?",
+            "summary": open_sales_summary,
+            "bullets": open_sales_bullets,
+            "stats": [
+                {"label": "Saldo aberto", "value": _format_sc(uncovered_volume)},
+                {"label": "Cobertura atual", "value": f"{_format_pct(coverage_ratio)}%"},
+                {"label": "Piso da política", "value": f"{_format_pct(policy_min_ratio)}%" if policy_min_ratio is not None else "Sem política"},
+            ],
+        },
+        {
+            "id": "expiring-bills",
+            "title": "Quais compromissos vencem em breve?",
+            "summary": expiring_bills_summary,
+            "bullets": expiring_bills_bullets,
+            "stats": [
+                {"label": "Próx. 7 dias", "value": str(operations["upcoming_7d_count"])},
+                {"label": "Próx. 30 dias", "value": str(operations["upcoming_30d_count"])},
+                {"label": "Derivativos", "value": str(operations["derivatives_30d_count"])},
+            ],
+        },
+        {
+            "id": "forms-gap",
+            "title": "Quais dados ainda faltam para melhorar a análise?",
+            "summary": forms_gap_summary,
+            "bullets": forms_gap_bullets,
+            "stats": [
+                {"label": "Bases faltantes", "value": str(len(missing_sources))},
+                {"label": "Bases com dados", "value": str(len(available_sources))},
+                {"label": "Frentes avaliadas", "value": str(len(data_quality["sources"]))},
+            ],
+        },
+        {
+            "id": "priority-actions",
+            "title": "O que merece atenção agora?",
+            "summary": local_insights.get("executive_summary") or "Sem leitura executiva disponível no momento.",
+            "bullets": priority_bullets,
+            "stats": [
+                {"label": "Ação sugerida", "value": str(local_insights.get("recommended_action") or "monitorar").capitalize()},
+                {"label": "MTM negativo", "value": _format_brl(payload["derivatives_open_mtm"].get("open_negative_total_brl", 0))},
+                {"label": "Alertas", "value": str(len(local_insights.get("warnings", [])) + len(local_insights.get("bullets", [])))},
+            ],
+        },
+    ]
 
 
 def _build_dashboard_stories(payload):
@@ -1106,6 +1185,15 @@ def build_insights_payload(request):
     forms_pending_count = sum(
         1 for count in [len(crop_boards), len(physical_sales), len(derivatives), len(hedge_policies), len(budget_costs), len(physical_payments), len(cash_payments)] if count == 0
     )
+    source_rows = [
+        {"key": "crop_boards", "label": "Quadro Safra", "count": len(crop_boards)},
+        {"key": "physical_sales", "label": "Vendas Físicas", "count": len(physical_sales)},
+        {"key": "derivatives", "label": "Derivativos", "count": len(derivatives)},
+        {"key": "hedge_policies", "label": "Política de Hedge", "count": len(hedge_policies)},
+        {"key": "budget_costs", "label": "Custo Orçamento", "count": len(budget_costs)},
+        {"key": "physical_payments", "label": "Pagamentos Físicos", "count": len(physical_payments)},
+        {"key": "cash_payments", "label": "Pagamentos de Caixa", "count": len(cash_payments)},
+    ]
 
     metrics = {
         "production_total_sc": round(production_total, 2),
@@ -1166,10 +1254,20 @@ def build_insights_payload(request):
             "recent_news_titles": [item.titulo for item in recent_news if item.titulo],
             "policy_reference_month": getattr(current_policy, "mes_ano", None).isoformat() if getattr(current_policy, "mes_ano", None) else None,
         },
+        "data_quality": {
+            "sources": [
+                {
+                    **item,
+                    "status": "ok" if item["count"] > 0 else "missing",
+                }
+                for item in source_rows
+            ]
+        },
     }
 
     local_insights = _build_local_insights(payload)
     payload["dashboard_stories"] = _build_dashboard_stories(payload)
+    payload["question_lab"] = _build_question_lab(payload, local_insights)
     ai_result = _call_openai_insights(payload, local_insights)
 
     response = {

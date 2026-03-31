@@ -1,6 +1,3 @@
-from functools import reduce
-
-from django.db.models import Q
 from rest_framework import serializers, viewsets
 
 from apps.auditing.context import suppress_audit_signals
@@ -10,8 +7,6 @@ from apps.auditing.services import build_log_changes, build_log_description, cre
 
 class TenantScopedModelViewSet(viewsets.ModelViewSet):
     tenant_field = "tenant"
-    group_field_candidates = ("grupo", "group", "grupos")
-    subgroup_field_candidates = ("subgrupo", "subgroup", "subgrupos")
 
     def _normalize_log_value(self, value):
         return normalize_log_value(value)
@@ -53,87 +48,7 @@ class TenantScopedModelViewSet(viewsets.ModelViewSet):
         if hasattr(queryset.model, self.tenant_field):
             accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
             queryset = queryset.filter(**{f"{self.tenant_field}_id__in": accessible_tenant_ids})
-        return self._filter_queryset_by_assignments(queryset, user)
-
-    def _available_relation_fields(self, model, candidates, related_model_label):
-        available = []
-        for field_name in candidates:
-            try:
-                field = model._meta.get_field(field_name)
-            except Exception:
-                continue
-            if not field.is_relation:
-                continue
-            remote_model = getattr(field, "related_model", None)
-            if remote_model and remote_model._meta.label == related_model_label:
-                available.append(field_name)
-        return available
-
-    def _build_assignment_queries(self, model, field_names, allowed_ids):
-        queries = []
-        if not allowed_ids:
-            return queries
-        for field_name in field_names:
-            model_field = model._meta.get_field(field_name)
-            if model_field.many_to_many:
-                queries.append(Q(**{f"{field_name}__id__in": allowed_ids}))
-            else:
-                queries.append(Q(**{f"{field_name}_id__in": allowed_ids}))
-        return queries
-
-    def _get_allowed_assignment_ids(self, user):
-        from apps.clients.models import EconomicGroup, SubGroup
-
-        if not getattr(user, "is_authenticated", False):
-            return [], []
-
-        accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
-
-        group_queryset = EconomicGroup.objects.all()
-        subgroup_queryset = SubGroup.objects.all()
-
-        if accessible_tenant_ids:
-            group_queryset = group_queryset.filter(tenant_id__in=accessible_tenant_ids)
-            subgroup_queryset = subgroup_queryset.filter(tenant_id__in=accessible_tenant_ids)
-
-        accessible_group_ids = set(getattr(user, "assigned_groups").values_list("id", flat=True))
-        accessible_subgroup_ids = set(getattr(user, "assigned_subgroups").values_list("id", flat=True))
-
-        accessible_group_ids.update(
-            group_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True)
-        )
-        accessible_subgroup_ids.update(
-            subgroup_queryset.filter(Q(owner=user) | Q(users_with_access=user)).values_list("id", flat=True)
-        )
-
-        return list(accessible_group_ids), list(accessible_subgroup_ids)
-
-    def _filter_queryset_by_assignments(self, queryset, user):
-        if getattr(user, "is_distributor_admin", lambda: False)() or getattr(user, "has_tenant_slug", lambda *args: False)("admin"):
-            return queryset
-
-        model = queryset.model
-        allowed_group_ids, allowed_subgroup_ids = self._get_allowed_assignment_ids(user)
-
-        if model._meta.label == "clients.EconomicGroup":
-            return queryset.filter(id__in=allowed_group_ids) if allowed_group_ids else queryset.none()
-        if model._meta.label == "clients.SubGroup":
-            return queryset.filter(id__in=allowed_subgroup_ids) if allowed_subgroup_ids else queryset.none()
-
-        group_fields = self._available_relation_fields(model, self.group_field_candidates, "clients.EconomicGroup")
-        subgroup_fields = self._available_relation_fields(model, self.subgroup_field_candidates, "clients.SubGroup")
-
-        if not group_fields and not subgroup_fields:
-            return queryset
-
-        queries = []
-        queries.extend(self._build_assignment_queries(model, group_fields, allowed_group_ids))
-        queries.extend(self._build_assignment_queries(model, subgroup_fields, allowed_subgroup_ids))
-
-        if not queries:
-            return queryset.none()
-
-        return queryset.filter(reduce(lambda left, right: left | right, queries)).distinct()
+        return queryset
 
     def perform_create(self, serializer):
         extra = {}

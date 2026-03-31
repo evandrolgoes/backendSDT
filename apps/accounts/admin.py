@@ -100,7 +100,13 @@ class UserAdmin(DjangoUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("username", "email", "full_name", "password1", "password2"),
+                "fields": (
+                    "username",
+                    "email",
+                    "full_name",
+                    "password1",
+                    "password2",
+                ),
             },
         ),
     )
@@ -112,4 +118,3 @@ class InvitationAdmin(admin.ModelAdmin):
     list_display = ("email", "kind", "tenant", "target_tenant_name", "status", "invited_by", "created_at")
     search_fields = ("full_name", "email", "tenant__name", "target_tenant_name", "target_tenant_slug")
     list_filter = ("kind", "status", "tenant")
-    filter_horizontal = ("assigned_groups", "assigned_subgroups")

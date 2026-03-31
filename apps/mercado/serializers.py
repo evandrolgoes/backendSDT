@@ -59,6 +59,10 @@ class MarketNewsPostSerializer(serializers.ModelSerializer):
             return ""
         return getattr(user, "full_name", "") or getattr(user, "username", "") or getattr(user, "email", "")
 
+    def create(self, validated_data):
+        validated_data.pop("remove_audio", False)
+        return super().create(validated_data)
+
     def update(self, instance, validated_data):
         remove_audio = validated_data.pop("remove_audio", False)
         if remove_audio and getattr(instance, "audio", None):

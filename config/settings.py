@@ -95,6 +95,7 @@ INSTALLED_APPS = [
     "apps.tradingview_scraper",
     "apps.mass_update",
     "apps.insights",
+    "apps.market_summary",
 ]
 
 MIDDLEWARE = [
@@ -212,6 +213,11 @@ ACCESS_REQUEST_NOTIFY_EMAIL = config("ACCESS_REQUEST_NOTIFY_EMAIL", default="eva
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@sdt.local")
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 OPENAI_INSIGHTS_MODEL = config("OPENAI_INSIGHTS_MODEL", default="gpt-5-mini")
+OPENAI_MARKET_SUMMARY_MODEL = config("OPENAI_MARKET_SUMMARY_MODEL", default="gpt-5-mini")
+AGRINVEST_USERNAME = config("AGRINVEST_USERNAME", default="")
+AGRINVEST_PASSWORD = config("AGRINVEST_PASSWORD", default="")
+AGRINVEST_CLIENT_ID = config("AGRINVEST_CLIENT_ID", default="D2365402-2F59-4627-A73D-71814F8FCCD2")
+AGRINVEST_NEWS_URL = config("AGRINVEST_NEWS_URL", default="https://go.agrinvest.agr.br/noticias")
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", cast=int, default=25)

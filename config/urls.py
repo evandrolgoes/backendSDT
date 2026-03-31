@@ -15,7 +15,6 @@ from apps.accounts.views import (
     ForgotPasswordView,
     InvitationAcceptView,
     InvitationDetailByTokenView,
-    InvitationViewSet,
     ImpersonateUserView,
     LoginView,
     ResetPasswordConfirmView,
@@ -44,6 +43,7 @@ from apps.mass_update.views import (
     MassUpdateResourcesView,
 )
 from apps.mass_update.copy_base_views import CopyBaseApplyView, CopyBasePreviewView, CopyBaseTargetsView
+from apps.market_summary.views import MarketSummaryGenerateView
 from apps.mercado.views import MarketNewsPostViewSet, mercado_health
 from apps.payables.views import AccountsPayableViewSet
 from apps.leads.views import LeadCreateView
@@ -64,7 +64,6 @@ from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
 router.register("users", UserViewSet, basename="user")
-router.register("invitations", InvitationViewSet, basename="invitation")
 router.register("admin-invitations", AdminInvitationViewSet, basename="admin-invitation")
 router.register("clients", ClientAccountViewSet, basename="client")
 router.register("groups", EconomicGroupViewSet, basename="group")
@@ -123,6 +122,7 @@ urlpatterns = [
     path("api/mass-import/resources/", MassImportResourcesView.as_view(), name="mass_import_resources"),
     path("api/mass-import/metadata/", MassImportMetadataView.as_view(), name="mass_import_metadata"),
     path("api/mass-import/apply/", MassImportApplyView.as_view(), name="mass_import_apply"),
+    path("api/market-summary/generate/", MarketSummaryGenerateView.as_view(), name="market_summary_generate"),
     path("api/insights/commercialization/", CommercialInsightsView.as_view(), name="commercial_insights"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),

@@ -47,9 +47,9 @@ class Command(BaseCommand):
         grupo_alpha, _ = EconomicGroup.objects.get_or_create(tenant_id=tenant, grupo="Grupo Alpha")
         grupo_sertao, _ = EconomicGroup.objects.get_or_create(tenant_id=tenant, grupo="Grupo Sertao")
 
-        subgrupo_norte, _ = SubGroup.objects.get_or_create(tenant_id=tenant, subgrupo="Fazenda Norte")
-        subgrupo_sul, _ = SubGroup.objects.get_or_create(tenant_id=tenant, subgrupo="Fazenda Sul")
-        subgrupo_leste, _ = SubGroup.objects.get_or_create(tenant_id=tenant, subgrupo="Unidade Leste")
+        subgrupo_norte, _ = SubGroup.objects.get_or_create(tenant_id=tenant, grupo=grupo_alpha, subgrupo="Fazenda Norte")
+        subgrupo_sul, _ = SubGroup.objects.get_or_create(tenant_id=tenant, grupo=grupo_alpha, subgrupo="Fazenda Sul")
+        subgrupo_leste, _ = SubGroup.objects.get_or_create(tenant_id=tenant, grupo=grupo_sertao, subgrupo="Unidade Leste")
 
         safra_2425, _ = CropSeason.objects.get_or_create(tenant_id=tenant, safra="24/25")
         safra_2526, _ = CropSeason.objects.get_or_create(tenant_id=tenant, safra="25/26")
