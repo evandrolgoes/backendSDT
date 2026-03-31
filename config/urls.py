@@ -1,8 +1,8 @@
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -138,9 +138,8 @@ urlpatterns = [
     path("api/auth/invitations/<str:token>/", InvitationDetailByTokenView.as_view(), name="invitation_detail_by_token"),
     path("api/auth/invitations/<str:token>/accept/", InvitationAcceptView.as_view(), name="invitation_accept"),
     path("api/leads/", LeadCreateView.as_view(), name="lead_create"),
+    re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
 ]
-
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
     urlpatterns += staticfiles_urlpatterns()
