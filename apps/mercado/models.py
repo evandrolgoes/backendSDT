@@ -24,12 +24,13 @@ class MarketNewsPost(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         related_name="published_market_news_posts",
     )
     audio = models.FileField(upload_to="market_news/audio/", null=True, blank=True)
+    inline_attachment_ids = models.JSONField(default=list, blank=True)
     conteudo_html = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-data_publicacao", "-created_at"]
-        verbose_name = "Market news post"
-        verbose_name_plural = "Market news posts"
+        verbose_name = "Blog post"
+        verbose_name_plural = "Blog posts"
 
     def __str__(self):
         return self.titulo

@@ -3,6 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from rest_framework import parsers, status
 from rest_framework.decorators import action
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 
 from apps.auditing.context import suppress_audit_signals
@@ -18,9 +19,18 @@ def mercado_health(_request):
     return JsonResponse({"status": "ok", "app": "mercado"})
 
 
+class MarketNewsPostPermission(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        user = getattr(request, "user", None)
+        return bool(user and user.is_authenticated and (user.is_superuser or user.is_tenant_admin()))
+
+
 class MarketNewsPostViewSet(TenantScopedModelViewSet):
     queryset = MarketNewsPost.objects.select_related("tenant", "created_by", "published_by").all()
     serializer_class = MarketNewsPostSerializer
+    permission_classes = [MarketNewsPostPermission]
     filterset_fields = ["status_artigo", "published_by"]
     search_fields = ["titulo", "categorias", "conteudo_html"]
 
@@ -30,14 +40,19 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
         return super().get_serializer_class()
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = self.queryset.all()
         user = getattr(self.request, "user", None)
-        if not user or not user.is_authenticated:
+        public_read = str(self.request.query_params.get("public", "")).strip().lower() in {"1", "true", "yes"}
+        if public_read:
             queryset = queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
-        elif not (user.is_superuser or user.is_tenant_admin()):
+        elif not user or not user.is_authenticated:
             queryset = queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
+        else:
+            queryset = super().get_queryset()
+            if not (user.is_superuser or user.is_tenant_admin()):
+                queryset = queryset.filter(status_artigo=MarketNewsPost.STATUS_PUBLISHED)
 
-        if self.action in {"list", "categories"}:
+        if self.action == "list":
             queryset = queryset.defer("conteudo_html")
         return queryset
 
@@ -68,6 +83,26 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
             instance = serializer.save(**self._build_save_kwargs(serializer))
         self._create_audit_log("alterado", instance, before=before, after=self._serialize_instance_for_log(instance))
 
+    def perform_destroy(self, instance):
+        before = self._serialize_instance_for_log(instance)
+        self._create_audit_log("excluido", instance, before=before, after={})
+
+        content_type = ContentType.objects.get_for_model(MarketNewsPost)
+        attachments = Attachment.objects.filter(
+            tenant=instance.tenant,
+            content_type=content_type,
+            object_id=instance.pk,
+        )
+
+        with suppress_audit_signals():
+            for attachment in attachments:
+                if getattr(attachment, "file", None):
+                    attachment.file.delete(save=False)
+            attachments.delete()
+            if getattr(instance, "audio", None):
+                instance.audio.delete(save=False)
+            instance.delete()
+
     @action(detail=True, methods=["get", "post"], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def attachments(self, request, pk=None):
         instance = self.get_object()
@@ -96,21 +131,3 @@ class MarketNewsPostViewSet(TenantScopedModelViewSet):
             AttachmentSerializer(created, many=True, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
-    @action(detail=False, methods=["get"], url_path="categories")
-    def categories(self, request):
-        names = []
-        seen = set()
-        queryset = self.filter_queryset(self.get_queryset()).only("id", "categorias")
-        for post in queryset.iterator():
-            for item in getattr(post, "categorias", []) or []:
-                normalized = str(item or "").strip()
-                if not normalized:
-                    continue
-                key = normalized.casefold()
-                if key in seen:
-                    continue
-                seen.add(key)
-                names.append(normalized)
-        names.sort(key=lambda value: value.casefold())
-        return Response(names)

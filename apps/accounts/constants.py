@@ -11,7 +11,7 @@ AVAILABLE_MODULES = [
     ("insights_commercialization", "Insights: Comercializacao"),
     ("market_fund_positions", "Mercado: Posicao de Fundos"),
     ("market_quotes", "Mercado: Cotacoes"),
-    ("market_blog_news", "Mercado: Blog/News"),
+    ("market_blog_news", "Mercado: Blog"),
     ("market_exports", "Mercado: Exportacoes"),
     ("market_basis", "Mercado: Basis"),
     ("market_interest_rates", "Mercado: Taxa de Juros"),

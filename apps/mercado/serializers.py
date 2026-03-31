@@ -56,6 +56,20 @@ class MarketNewsPostSerializer(serializers.ModelSerializer):
             items.append(normalized)
         return items
 
+    def validate_inline_attachment_ids(self, value):
+        items = []
+        seen = set()
+        for item in value or []:
+            try:
+                normalized = int(item)
+            except (TypeError, ValueError):
+                continue
+            if normalized <= 0 or normalized in seen:
+                continue
+            seen.add(normalized)
+            items.append(normalized)
+        return items
+
     def get_published_by_name(self, obj):
         user = getattr(obj, "published_by", None)
         if not user:
