@@ -58,7 +58,11 @@ else:
 SECRET_KEY = config("SECRET_KEY", default="unsafe-secret-key")
 DEBUG = config("DEBUG", cast=cast_bool, default=True)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv(), default="localhost,127.0.0.1")
-CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", cast=Csv(), default="")
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    cast=Csv(),
+    default="http://localhost:5174,https://frontend-sdt.vercel.app",
+)
 ALLOWED_HOSTS = normalize_hosts(ALLOWED_HOSTS)
 
 render_external_hostname = normalize_host(os.environ.get("RENDER_EXTERNAL_HOSTNAME", ""))
@@ -202,11 +206,17 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
 }
 
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", cast=Csv(), default="http://localhost:5174")
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    cast=Csv(),
+    default="http://localhost:5174,https://frontend-sdt.vercel.app",
+)
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
     r"^http://127\.0\.0\.1:\d+$",
+    r"^https://frontend-sdt(?:-[a-z0-9-]+)?\.vercel\.app$",
 ]
+CORS_ALLOWED_ORIGIN_REGEXES.extend(config("CORS_ALLOWED_ORIGIN_REGEXES_EXTRA", cast=Csv(), default=""))
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5174")
 ACCESS_REQUEST_NOTIFY_EMAIL = config("ACCESS_REQUEST_NOTIFY_EMAIL", default="evandrogoes@agrosaldaterra.com.br")
