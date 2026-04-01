@@ -28,6 +28,8 @@ class PhysicalQuoteViewSet(TenantScopedModelViewSet):
 class BudgetCostViewSet(TenantScopedModelViewSet):
     queryset = BudgetCost.objects.select_related("tenant", "subgrupo", "grupo", "cultura", "safra", "created_by").all()
     serializer_class = BudgetCostSerializer
+    group_scope_fields = ("grupo",)
+    subgroup_scope_fields = ("subgrupo",)
     filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "considerar_na_politica_de_hedge", "moeda"]
     search_fields = ["grupo_despesa", "obs"]
 
@@ -35,6 +37,8 @@ class BudgetCostViewSet(TenantScopedModelViewSet):
 class ActualCostViewSet(TenantScopedModelViewSet):
     queryset = ActualCost.objects.select_related("tenant", "subgrupo", "grupo", "cultura", "safra", "created_by").all()
     serializer_class = ActualCostSerializer
+    group_scope_fields = ("grupo",)
+    subgroup_scope_fields = ("subgrupo",)
     filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "moeda", "data_travamento"]
     search_fields = ["grupo_despesa", "obs"]
 
@@ -42,6 +46,8 @@ class ActualCostViewSet(TenantScopedModelViewSet):
 class PhysicalSaleViewSet(TenantScopedModelViewSet):
     queryset = PhysicalSale.objects.select_related("tenant", "grupo", "subgrupo", "cultura", "safra", "contraparte", "created_by").all()
     serializer_class = PhysicalSaleSerializer
+    group_scope_fields = ("grupo",)
+    subgroup_scope_fields = ("subgrupo",)
     filterset_fields = ["tenant", "grupo", "subgrupo", "cultura", "safra", "contraparte", "compra_venda", "moeda_contrato", "moeda_unidade", "bolsa_ref", "contrato_bolsa", "localidade"]
     search_fields = ["cultura_produto", "objetivo_venda_dolarizada", "localidade", "contrato_bolsa", "obs"]
 
@@ -75,6 +81,8 @@ class PhysicalSaleViewSet(TenantScopedModelViewSet):
 class PhysicalPaymentViewSet(TenantScopedModelViewSet):
     queryset = PhysicalPayment.objects.select_related("tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "created_by").all()
     serializer_class = PhysicalPaymentSerializer
+    group_scope_fields = ("grupo",)
+    subgroup_scope_fields = ("subgrupo",)
     filterset_fields = ["tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "unidade", "classificacao", "data_pagamento"]
     search_fields = ["descricao", "classificacao", "obs"]
 
@@ -82,5 +90,7 @@ class PhysicalPaymentViewSet(TenantScopedModelViewSet):
 class CashPaymentViewSet(TenantScopedModelViewSet):
     queryset = CashPayment.objects.select_related("tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "created_by").all()
     serializer_class = CashPaymentSerializer
+    group_scope_fields = ("grupo",)
+    subgroup_scope_fields = ("subgrupo",)
     filterset_fields = ["tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "moeda", "data_desembolso", "data_pagamento"]
     search_fields = ["descricao", "obs"]

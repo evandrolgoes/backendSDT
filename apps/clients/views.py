@@ -23,22 +23,24 @@ class EconomicGroupViewSet(TenantScopedModelViewSet):
     queryset = EconomicGroup.objects.select_related("tenant").all()
     serializer_class = EconomicGroupSerializer
     permission_classes = [IsMasterAdminOrTenantUser]
+    group_scope_fields = ("id",)
     filterset_fields = ["tenant"]
     search_fields = ["grupo"]
 
     def get_queryset(self):
-        return super().get_queryset().distinct()
+        return super().get_queryset().order_by("grupo", "id").distinct()
 
 
 class SubGroupViewSet(TenantScopedModelViewSet):
     queryset = SubGroup.objects.select_related("tenant", "grupo").all()
     serializer_class = SubGroupSerializer
     permission_classes = [IsMasterAdminOrTenantUser]
+    subgroup_scope_fields = ("id",)
     filterset_fields = ["tenant"]
     search_fields = ["subgrupo"]
 
     def get_queryset(self):
-        return super().get_queryset().distinct()
+        return super().get_queryset().order_by("grupo__grupo", "subgrupo", "id").distinct()
 
 
 class CropSeasonViewSet(TenantScopedModelViewSet):
@@ -51,6 +53,7 @@ class CropSeasonViewSet(TenantScopedModelViewSet):
 class CounterpartyViewSet(TenantScopedModelViewSet):
     queryset = Counterparty.objects.select_related("tenant", "grupo").all()
     serializer_class = CounterpartySerializer
+    group_scope_fields = ("grupo",)
     filterset_fields = ["tenant", "grupo"]
     search_fields = ["contraparte", "obs"]
 

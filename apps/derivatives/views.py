@@ -894,6 +894,8 @@ class DerivativeOperationViewSet(TenantScopedModelViewSet):
         "tenant", "subgrupo", "grupo", "ativo", "safra", "contraparte", "created_by"
     ).all()
     serializer_class = DerivativeOperationSerializer
+    group_scope_fields = ("grupo",)
+    subgroup_scope_fields = ("subgrupo",)
     filterset_fields = ["tenant", "subgrupo", "grupo", "ativo", "safra", "contraparte", "status_operacao"]
     search_fields = ["cod_operacao_mae", "nome_da_operacao", "bolsa_ref"]
 

@@ -3,10 +3,13 @@ from rest_framework import serializers, viewsets
 from apps.auditing.context import suppress_audit_signals
 from apps.auditing.models import Attachment, AuditLog
 from apps.auditing.services import build_log_changes, build_log_description, create_audit_log, normalize_log_value, serialize_instance_for_log
+from apps.core.group_access import apply_queryset_assignment_scope
 
 
 class TenantScopedModelViewSet(viewsets.ModelViewSet):
     tenant_field = "tenant"
+    group_scope_fields = ()
+    subgroup_scope_fields = ()
 
     def _normalize_log_value(self, value):
         return normalize_log_value(value)
@@ -45,10 +48,15 @@ class TenantScopedModelViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_superuser:
             return queryset
-        if hasattr(queryset.model, self.tenant_field):
+        if "__" in self.tenant_field or hasattr(queryset.model, self.tenant_field):
             accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
             queryset = queryset.filter(**{f"{self.tenant_field}_id__in": accessible_tenant_ids})
-        return queryset
+        return apply_queryset_assignment_scope(
+            queryset,
+            user,
+            group_fields=self.group_scope_fields,
+            subgroup_fields=self.subgroup_scope_fields,
+        )
 
     def perform_create(self, serializer):
         extra = {}

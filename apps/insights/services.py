@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.core.group_access import apply_queryset_assignment_scope
 from apps.derivatives.models import DerivativeOperation
 from apps.mercado.models import MarketNewsPost
 from apps.physical.models import BudgetCost, CashPayment, PhysicalPayment, PhysicalSale
@@ -63,7 +64,12 @@ def _scope_queryset(queryset, user, group_fields=(), subgroup_fields=()):
     if hasattr(queryset.model, "tenant_id"):
         queryset = queryset.filter(tenant_id__in=accessible_tenant_ids)
 
-    return queryset.distinct()
+    return apply_queryset_assignment_scope(
+        queryset,
+        user,
+        group_fields=group_fields,
+        subgroup_fields=subgroup_fields,
+    )
 
 
 def _apply_filters(queryset, request, *, group_fields=(), subgroup_fields=(), culture_fields=(), season_fields=()):

@@ -1,3 +1,7 @@
+from functools import reduce
+from operator import or_
+
+from django.db.models import Q
 from rest_framework import serializers
 
 
@@ -7,16 +11,76 @@ def get_user_assignment_scope(user):
             "has_scope": False,
             "direct_group_ids": [],
             "direct_subgroup_ids": [],
+            "visible_group_ids": [],
+            "visible_subgroup_ids": [],
         }
 
     direct_group_ids = set(user.assigned_groups.values_list("id", flat=True))
     direct_subgroup_ids = set(user.assigned_subgroups.values_list("id", flat=True))
 
+    if not direct_group_ids and not direct_subgroup_ids:
+        return {
+            "has_scope": False,
+            "direct_group_ids": [],
+            "direct_subgroup_ids": [],
+            "visible_group_ids": [],
+            "visible_subgroup_ids": [],
+        }
+
+    from apps.clients.models import SubGroup
+
+    subgroup_parent_group_ids = set(
+        SubGroup.objects.filter(id__in=direct_subgroup_ids).values_list("grupo_id", flat=True)
+    )
+    group_subgroup_ids = set(
+        SubGroup.objects.filter(grupo_id__in=direct_group_ids).values_list("id", flat=True)
+    )
+
+    visible_group_ids = direct_group_ids | subgroup_parent_group_ids
+    visible_subgroup_ids = direct_subgroup_ids | group_subgroup_ids
+
     return {
-        "has_scope": bool(direct_group_ids or direct_subgroup_ids),
+        "has_scope": True,
         "direct_group_ids": list(direct_group_ids),
         "direct_subgroup_ids": list(direct_subgroup_ids),
+        "visible_group_ids": list(visible_group_ids),
+        "visible_subgroup_ids": list(visible_subgroup_ids),
     }
+
+
+def _build_scope_lookup(model, field_name):
+    field = model._meta.get_field(field_name)
+    if getattr(field, "many_to_many", False):
+        return f"{field_name}__id__in"
+    if getattr(field, "is_relation", False):
+        return f"{field_name}_id__in"
+    return f"{field_name}__in"
+
+
+def apply_queryset_assignment_scope(queryset, user, *, group_fields=(), subgroup_fields=()):
+    if not getattr(user, "is_authenticated", False) or getattr(user, "is_superuser", False):
+        return queryset
+
+    scope = get_user_assignment_scope(user)
+    if not scope["has_scope"]:
+        return queryset.distinct()
+
+    predicates = []
+    group_ids = scope["visible_group_ids"]
+    subgroup_ids = scope["visible_subgroup_ids"]
+
+    for field_name in group_fields or ():
+        if group_ids:
+            predicates.append(Q(**{_build_scope_lookup(queryset.model, field_name): group_ids}))
+
+    for field_name in subgroup_fields or ():
+        if subgroup_ids:
+            predicates.append(Q(**{_build_scope_lookup(queryset.model, field_name): subgroup_ids}))
+
+    if not predicates:
+        return queryset.none()
+
+    return queryset.filter(reduce(or_, predicates)).distinct()
 
 
 def resolve_group_subgroup_pair(group, subgroup, *, group_field_name="grupo", subgroup_field_name="subgrupo"):

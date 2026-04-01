@@ -20,6 +20,8 @@ def anotacoes_health(_request):
 class AnotacaoViewSet(TenantScopedModelViewSet):
     queryset = Anotacao.objects.select_related("tenant", "created_by", "modificado_por").prefetch_related("grupos", "subgrupos").all()
     serializer_class = AnotacaoSerializer
+    group_scope_fields = ("grupos",)
+    subgroup_scope_fields = ("subgrupos",)
     filterset_fields = ["grupos", "subgrupos", "modificado_por"]
     search_fields = ["titulo", "participantes", "conteudo_html", "grupos__grupo", "subgrupos__subgrupo"]
 

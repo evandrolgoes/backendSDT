@@ -1,6 +1,7 @@
 from django.db import models
 from rest_framework import generics, permissions, response, status
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import MethodNotAllowed, PermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -125,15 +126,15 @@ class UserViewSet(TenantScopedModelViewSet):
     ordering_fields = ["username", "created_at"]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = self.queryset
         if self.request.user.is_superuser:
             return queryset
         if self.request.user.has_tenant_slug("admin"):
             return queryset
+        root_user = self.request.user.get_master_root()
         if self.request.user.has_tenant_slug("consultor"):
-            root_user = self.request.user.get_master_root()
             return queryset.filter(models.Q(tenant=self.request.user.tenant) | models.Q(tenant__slug="usuario", master_user=root_user))
-        return queryset.filter(tenant=self.request.user.tenant)
+        return queryset.filter(models.Q(tenant=self.request.user.tenant) | models.Q(tenant__slug="usuario", master_user=root_user))
 
 class ImpersonateUserView(APIView):
     permission_classes = [IsMasterAdminOrTenantManager]
@@ -176,7 +177,15 @@ class AdminInvitationViewSet(TenantScopedModelViewSet):
         context["invitation_kind"] = Invitation.Kind.PLATFORM_ADMIN
         return context
 
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed("PUT", detail="Convites enviados nao podem ser editados.")
+
+    def partial_update(self, request, *args, **kwargs):
+        raise MethodNotAllowed("PATCH", detail="Convites enviados nao podem ser editados.")
+
     def perform_destroy(self, instance):
+        if not self.request.user.is_superuser:
+            raise PermissionDenied("Apenas superusuario pode excluir convites.")
         accepted_user = instance.accepted_user
         super().perform_destroy(instance)
         if accepted_user and accepted_user.pk:
