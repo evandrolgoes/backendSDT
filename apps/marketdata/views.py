@@ -22,4 +22,4 @@ class FxRateViewSet(viewsets.ModelViewSet):
 class BasisSeriesViewSet(TenantScopedModelViewSet):
     queryset = BasisSeries.objects.select_related("tenant", "crop", "source").all()
     serializer_class = BasisSeriesSerializer
-    filterset_fields = ["tenant", "crop", "region", "source", "basis_date"]
+    filterset_fields = ["crop", "region", "source", "basis_date"]

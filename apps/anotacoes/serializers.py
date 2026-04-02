@@ -1,12 +1,13 @@
 from rest_framework import serializers
 
-from apps.core.group_access import resolve_group_subgroup_collections
 from apps.clients.models import EconomicGroup, SubGroup
+from apps.core.privacy import get_accessible_group_queryset, get_accessible_subgroup_queryset
+from apps.core.serializers import PrivacyScopedSerializerMixin
 
 from .models import Anotacao
 
 
-class AnotacaoSerializer(serializers.ModelSerializer):
+class AnotacaoSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     grupos = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
     subgrupos = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
     grupos_display = serializers.SerializerMethodField()
@@ -22,10 +23,13 @@ class AnotacaoSerializer(serializers.ModelSerializer):
     def get_fields(self):
         fields = super().get_fields()
         request = self.context.get("request")
-        if request and getattr(request.user, "is_authenticated", False):
-            tenant_ids = getattr(request.user, "get_accessible_tenant_ids", lambda: [getattr(request.user, "tenant_id", None)])()
-            fields["grupos"].queryset = EconomicGroup.objects.filter(tenant_id__in=tenant_ids).order_by("grupo")
-            fields["subgrupos"].queryset = SubGroup.objects.filter(tenant_id__in=tenant_ids).order_by("subgrupo")
+        actor = getattr(request, "user", None)
+        if actor and getattr(actor, "is_authenticated", False):
+            fields["grupos"].queryset = get_accessible_group_queryset(actor)
+            fields["subgrupos"].queryset = get_accessible_subgroup_queryset(actor)
+        else:
+            fields["grupos"].queryset = EconomicGroup.objects.all().order_by("grupo")
+            fields["subgrupos"].queryset = SubGroup.objects.all().order_by("subgrupo")
         return fields
 
     def validate_titulo(self, value):
@@ -36,23 +40,6 @@ class AnotacaoSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        request = self.context.get("request")
-        tenant = getattr(self.instance, "tenant", None) or getattr(request.user, "tenant", None)
-        if request and not getattr(request.user, "tenant_id", None):
-            raise serializers.ValidationError({"tenant": "O usuario autenticado nao possui tenant vinculado."})
-
-        for field_name in ["grupos", "subgrupos"]:
-            values = attrs.get(field_name)
-            if values is None or tenant is None:
-                continue
-            invalid = [item.pk for item in values if item.tenant_id != tenant.id]
-            if invalid:
-                raise serializers.ValidationError({field_name: "Todos os relacionamentos precisam pertencer ao mesmo tenant."})
-
-        groups = attrs.get("grupos", self.instance.grupos.all() if self.instance else [])
-        subgroups = attrs.get("subgrupos", self.instance.subgrupos.all() if self.instance else [])
-        attrs["grupos"] = resolve_group_subgroup_collections(groups, subgroups)
-
         return attrs
 
     def get_grupos_display(self, obj):

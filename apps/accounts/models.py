@@ -77,14 +77,17 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30, blank=True)
+    cpf = models.CharField(max_length=20, blank=True)
+    cep = models.CharField(max_length=20, blank=True)
+    estado = models.CharField(max_length=120, blank=True)
+    cidade = models.CharField(max_length=120, blank=True)
+    endereco_completo = models.TextField(blank=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STAFF)
     access_status = models.CharField(max_length=20, choices=AccessStatus.choices, default=AccessStatus.ACTIVE)
     max_admin_invitations = models.PositiveIntegerField(null=True, blank=True)
     max_owned_groups = models.PositiveIntegerField(null=True, blank=True)
     max_owned_subgroups = models.PositiveIntegerField(null=True, blank=True)
     scope_access_level = models.CharField(max_length=20, choices=ScopeAccessLevel.choices, default=ScopeAccessLevel.READ)
-    assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="assigned_users")
-    assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="assigned_users")
     allowed_modules = models.JSONField(default=list, blank=True, null=True)
     dashboard_filter = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -106,23 +109,12 @@ class User(AbstractUser):
     def __str__(self):
         return self.username
 
-    def get_allowed_modules(self):
-        if self.is_superuser:
-            return list(AVAILABLE_MODULE_CODES)
-        configured = self.allowed_modules or []
-        return [code for code in AVAILABLE_MODULE_CODES if code in configured]
-
     def get_effective_modules(self):
         if self.is_superuser:
             return list(AVAILABLE_MODULE_CODES)
-
-        tenant_modules = self.tenant.get_enabled_modules() if self.tenant_id else list(AVAILABLE_MODULE_CODES)
-        allowed_modules = self.get_allowed_modules()
-
-        if not allowed_modules:
-            return tenant_modules
-
-        return [code for code in tenant_modules if code in allowed_modules]
+        if self.tenant_id:
+            return self.tenant.get_enabled_modules()
+        return list(AVAILABLE_MODULE_CODES)
 
     def has_module_access(self, module_code):
         if self.is_superuser:
@@ -158,17 +150,6 @@ class User(AbstractUser):
         if self.is_superuser:
             return True
         return bool(self.tenant_id and self.tenant.slug in set(slugs))
-
-    def get_accessible_tenant_ids(self):
-        if self.is_superuser:
-            return list(Tenant.objects.values_list("id", flat=True))
-        if not self.tenant_id:
-            return []
-        if self.has_tenant_slug("admin"):
-            return list(Tenant.objects.values_list("id", flat=True))
-        if self.has_tenant_slug("usuario") and self.master_user_id and self.master_user.tenant_id:
-            return [tenant_id for tenant_id in {self.tenant_id, self.master_user.tenant_id} if tenant_id]
-        return [self.tenant_id]
 
     def get_master_root(self):
         return self.master_user or self
@@ -213,8 +194,6 @@ class Invitation(TimeStampedModel):
     phone = models.CharField(max_length=30, blank=True)
     access_status = models.CharField(max_length=20, choices=User.AccessStatus.choices, default=User.AccessStatus.ACTIVE)
     max_admin_invitations = models.PositiveIntegerField(null=True, blank=True)
-    assigned_groups = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="invitations")
-    assigned_subgroups = models.ManyToManyField("clients.SubGroup", blank=True, related_name="invitations")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     message = models.TextField(blank=True)
     expires_at = models.DateField(null=True, blank=True)

@@ -2,11 +2,12 @@ import re
 
 from rest_framework import serializers
 
-from apps.core.group_access import resolve_group_subgroup_pair
+from apps.core.serializers import PrivacyScopedSerializerMixin
+
 from .models import DerivativeOperation
 
 
-class DerivativeOperationSerializer(serializers.ModelSerializer):
+class DerivativeOperationSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     def _build_next_operation_code(self, tenant):
         queryset = DerivativeOperation.objects.all()
         if tenant is not None:
@@ -24,15 +25,6 @@ class DerivativeOperationSerializer(serializers.ModelSerializer):
         if not str(validated_data.get("cod_operacao_mae") or "").strip():
             validated_data["cod_operacao_mae"] = self._build_next_operation_code(validated_data.get("tenant"))
         return super().create(validated_data)
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        group = attrs.get("grupo", getattr(self.instance, "grupo", None))
-        subgroup = attrs.get("subgrupo", getattr(self.instance, "subgrupo", None))
-        resolved_group = resolve_group_subgroup_pair(group, subgroup)
-        if resolved_group is not None:
-            attrs["grupo"] = resolved_group
-        return attrs
 
     class Meta:
         model = DerivativeOperation

@@ -1,9 +1,12 @@
 from rest_framework import serializers
 
+from apps.core.privacy import get_accessible_group_queryset
+from apps.core.serializers import PrivacyScopedSerializerMixin
+
 from .models import Broker, ClientAccount, Counterparty, CropSeason, EconomicGroup, SubGroup
 
 
-class TenantScopedSerializer(serializers.ModelSerializer):
+class TenantScopedSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     def get_fields(self):
         fields = super().get_fields()
         request = self.context.get("request")
@@ -70,7 +73,10 @@ class SubGroupSerializer(TenantScopedSerializer):
 
     def get_fields(self):
         fields = super().get_fields()
-        fields["grupo"] = serializers.PrimaryKeyRelatedField(queryset=EconomicGroup.objects.all())
+        request = self.context.get("request")
+        actor = getattr(request, "user", None)
+        queryset = get_accessible_group_queryset(actor) if actor and getattr(actor, "is_authenticated", False) else EconomicGroup.objects.all()
+        fields["grupo"] = serializers.PrimaryKeyRelatedField(queryset=queryset)
         return fields
 
     def validate(self, attrs):

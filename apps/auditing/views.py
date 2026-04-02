@@ -13,7 +13,7 @@ from .serializers import AttachmentSerializer, AuditLogSerializer
 class AuditLogViewSet(TenantScopedModelViewSet):
     queryset = AuditLog.objects.select_related("tenant", "user", "content_type").all()
     serializer_class = AuditLogSerializer
-    filterset_fields = ["tenant", "user", "action", "content_type", "formulario", "object_id"]
+    filterset_fields = ["user", "action", "content_type", "formulario", "object_id"]
     search_fields = ["description", "formulario"]
     http_method_names = ["get", "head", "options", "delete"]
 
@@ -38,7 +38,7 @@ class AuditLogViewSet(TenantScopedModelViewSet):
 class AttachmentViewSet(TenantScopedModelViewSet):
     queryset = Attachment.objects.select_related("tenant", "uploaded_by", "content_type").all()
     serializer_class = AttachmentSerializer
-    filterset_fields = ["tenant", "uploaded_by", "content_type"]
+    filterset_fields = ["uploaded_by", "content_type"]
 
     def perform_create(self, serializer):
         extra = {"uploaded_by": self.request.user}

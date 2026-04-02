@@ -13,6 +13,8 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.clients.models import EconomicGroup, SubGroup
+from apps.core.privacy import get_accessible_group_queryset, get_accessible_subgroup_queryset, sanitize_dashboard_filter
+from apps.core.serializers import PrivacyScopedSerializerMixin
 from .constants import AVAILABLE_MODULE_CODES, AVAILABLE_MODULE_CHOICES
 from .models import Invitation, Tenant, User
 
@@ -27,29 +29,6 @@ def send_invitation_email(invitation):
         f"Este convite expira em {invitation.expires_at.strftime('%d/%m/%Y')}."
     )
     send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [invitation.email], fail_silently=False)
-
-
-def _get_actor_tenant_ids(actor):
-    if not actor or not getattr(actor, "is_authenticated", False):
-        return []
-    if actor.is_superuser:
-        return list(Tenant.objects.values_list("id", flat=True))
-    return list(getattr(actor, "get_accessible_tenant_ids", lambda: [getattr(actor, "tenant_id", None)])())
-
-
-def _configure_scope_field_querysets(fields, actor):
-    tenant_ids = _get_actor_tenant_ids(actor)
-    group_queryset = EconomicGroup.objects.all().order_by("grupo")
-    subgroup_queryset = SubGroup.objects.select_related("grupo").all().order_by("subgrupo")
-    if tenant_ids and not getattr(actor, "is_superuser", False):
-        group_queryset = group_queryset.filter(tenant_id__in=tenant_ids)
-        subgroup_queryset = subgroup_queryset.filter(tenant_id__in=tenant_ids)
-
-    if "assigned_groups" in fields:
-        fields["assigned_groups"].queryset = group_queryset
-    if "assigned_subgroups" in fields:
-        fields["assigned_subgroups"].queryset = subgroup_queryset
-
 
 def _normalize_master_user(master_user):
     if master_user is None:
@@ -82,24 +61,6 @@ def _validate_master_user_access(actor, master_user):
     target_root = _normalize_master_user(master_user)
     if getattr(actor_root, "pk", None) != getattr(target_root, "pk", None):
         raise serializers.ValidationError({"master_user": "A carteira selecionada precisa pertencer ao mesmo contexto do usuario."})
-
-
-def _validate_scope_assignments(*, tenant, groups, subgroups):
-    if tenant is None:
-        return
-
-    invalid_group = any(item.tenant_id != tenant.id for item in groups or [])
-    invalid_subgroup = any(item.tenant_id != tenant.id for item in subgroups or [])
-    if invalid_group:
-        raise serializers.ValidationError({"assigned_groups": "Todos os grupos selecionados precisam pertencer ao mesmo contexto de acesso do usuario."})
-    if invalid_subgroup:
-        raise serializers.ValidationError({"assigned_subgroups": "Todos os subgrupos selecionados precisam pertencer ao mesmo contexto de acesso do usuario."})
-
-
-def _resolve_scope_source_tenant(tenant, master_user=None):
-    if tenant is not None and getattr(tenant, "slug", "") == "usuario" and getattr(master_user, "tenant_id", None):
-        return master_user.tenant
-    return tenant
 
 
 class TenantSerializer(serializers.ModelSerializer):
@@ -146,10 +107,15 @@ class TenantSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
-    assigned_groups = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
-    assigned_subgroups = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
+    accessible_groups = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
+    accessible_subgroups = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
+    allowed_modules = serializers.ListField(
+        child=serializers.ChoiceField(choices=AVAILABLE_MODULE_CHOICES),
+        required=False,
+        allow_empty=True,
+    )
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     tenant_slug = serializers.CharField(source="tenant.slug", read_only=True)
     tenant_requires_master_user = serializers.SerializerMethodField()
@@ -191,7 +157,12 @@ class UserSerializer(serializers.ModelSerializer):
                 fields["master_user"].queryset = User.objects.none()
         if request and getattr(actor, "is_authenticated", False) and self._actor_can_choose_tenant(actor):
             fields["master_user"].queryset = master_user_queryset
-        _configure_scope_field_querysets(fields, actor)
+        if request and getattr(actor, "is_authenticated", False):
+            fields["accessible_groups"].queryset = get_accessible_group_queryset(actor)
+            fields["accessible_subgroups"].queryset = get_accessible_subgroup_queryset(actor)
+        else:
+            fields["accessible_groups"].queryset = EconomicGroup.objects.all().order_by("grupo")
+            fields["accessible_subgroups"].queryset = SubGroup.objects.select_related("grupo").all().order_by("subgrupo")
         return fields
 
     class Meta:
@@ -216,11 +187,18 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "full_name",
             "phone",
+            "cpf",
+            "cep",
+            "estado",
+            "cidade",
+            "endereco_completo",
             "max_admin_invitations",
             "max_owned_groups",
             "max_owned_subgroups",
-            "assigned_groups",
-            "assigned_subgroups",
+            "scope_access_level",
+            "accessible_groups",
+            "accessible_subgroups",
+            "allowed_modules",
             "access_status",
             "is_active",
             "is_superuser",
@@ -246,6 +224,14 @@ class UserSerializer(serializers.ModelSerializer):
     def get_tenant_requires_master_user(self, obj):
         return _tenant_requires_master_user(getattr(obj, "tenant", None))
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user and getattr(user, "is_authenticated", False):
+            data["dashboard_filter"] = sanitize_dashboard_filter(user, data.get("dashboard_filter") or {})
+        return data
+
     def validate_tenant(self, value):
         request = self.context["request"]
         if not getattr(request.user, "is_authenticated", False):
@@ -259,15 +245,16 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context["request"]
         password = validated_data.pop("password", None)
-        assigned_groups = validated_data.pop("assigned_groups", [])
-        assigned_subgroups = validated_data.pop("assigned_subgroups", [])
+        accessible_groups = validated_data.pop("accessible_groups", [])
+        accessible_subgroups = validated_data.pop("accessible_subgroups", [])
+        allowed_modules = validated_data.pop("allowed_modules", [])
         if getattr(request.user, "is_authenticated", False) and not request.user.is_superuser:
             if not self._actor_can_choose_tenant(request.user):
                 validated_data["tenant"] = request.user.tenant
                 validated_data["master_user"] = request.user.get_master_root()
             elif not validated_data.get("tenant"):
                 validated_data["tenant"] = request.user.tenant
-        validated_data["allowed_modules"] = []
+        validated_data["allowed_modules"] = list(allowed_modules or [])
         validated_data.setdefault("role", User.Role.STAFF)
         tenant = validated_data.get("tenant")
         if tenant and _tenant_requires_master_user(tenant) and not validated_data.get("master_user") and getattr(request.user, "is_authenticated", False):
@@ -280,24 +267,26 @@ class UserSerializer(serializers.ModelSerializer):
         else:
             user.set_unusable_password()
         user.save()
-        user.assigned_groups.set(assigned_groups)
-        user.assigned_subgroups.set(assigned_subgroups)
+        user.accessible_groups.set(accessible_groups)
+        user.accessible_subgroups.set(accessible_subgroups)
         return user
 
     def update(self, instance, validated_data):
         password = validated_data.pop("password", None)
-        assigned_groups = validated_data.pop("assigned_groups", None)
-        assigned_subgroups = validated_data.pop("assigned_subgroups", None)
+        accessible_groups = validated_data.pop("accessible_groups", None)
+        accessible_subgroups = validated_data.pop("accessible_subgroups", None)
+        allowed_modules = validated_data.pop("allowed_modules", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.allowed_modules = []
+        if allowed_modules is not None:
+            instance.allowed_modules = list(allowed_modules or [])
         if password:
             instance.set_password(password)
         instance.save()
-        if assigned_groups is not None:
-            instance.assigned_groups.set(assigned_groups)
-        if assigned_subgroups is not None:
-            instance.assigned_subgroups.set(assigned_subgroups)
+        if accessible_groups is not None:
+            instance.accessible_groups.set(accessible_groups)
+        if accessible_subgroups is not None:
+            instance.accessible_subgroups.set(accessible_subgroups)
         return instance
 
     def validate(self, attrs):
@@ -328,13 +317,6 @@ class UserSerializer(serializers.ModelSerializer):
             else:
                 attrs["master_user"] = None
                 master_user = None
-        groups = attrs["assigned_groups"] if "assigned_groups" in attrs else (self.instance.assigned_groups.all() if self.instance else [])
-        subgroups = attrs["assigned_subgroups"] if "assigned_subgroups" in attrs else (self.instance.assigned_subgroups.all() if self.instance else [])
-        _validate_scope_assignments(
-            tenant=_resolve_scope_source_tenant(tenant, master_user),
-            groups=groups,
-            subgroups=subgroups,
-        )
         return attrs
 
 
@@ -360,8 +342,6 @@ class DashboardFilterSerializer(serializers.Serializer):
         return normalized
 
 class BaseInvitationSerializer(serializers.ModelSerializer):
-    assigned_groups = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
-    assigned_subgroups = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     invited_by_name = serializers.CharField(source="invited_by.full_name", read_only=True)
     master_user_name = serializers.CharField(source="master_user.full_name", read_only=True)
@@ -390,8 +370,6 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
             "phone",
             "access_status",
             "max_admin_invitations",
-            "assigned_groups",
-            "assigned_subgroups",
             "message",
             "accepted_user",
             "accepted_user_name",
@@ -414,7 +392,6 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         actor = getattr(request, "user", None)
         fields["master_user"].queryset = _get_available_master_user_queryset(actor)
-        _configure_scope_field_querysets(fields, actor)
         return fields
 
     def validate_tenant(self, value):
@@ -494,14 +471,6 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
             else:
                 attrs["master_user"] = None
                 master_user = None
-
-        groups = attrs.get("assigned_groups", self.instance.assigned_groups.all() if self.instance else [])
-        subgroups = attrs.get("assigned_subgroups", self.instance.assigned_subgroups.all() if self.instance else [])
-        _validate_scope_assignments(
-            tenant=_resolve_scope_source_tenant(scope_tenant, master_user),
-            groups=groups,
-            subgroups=subgroups,
-        )
 
         if request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
             if invitation_kind == Invitation.Kind.PLATFORM_ADMIN:
@@ -624,8 +593,6 @@ class InvitationAcceptSerializer(serializers.Serializer):
         )
         user.set_password(self.validated_data["password"])
         user.save()
-        user.assigned_groups.set(invitation.assigned_groups.all())
-        user.assigned_subgroups.set(invitation.assigned_subgroups.all())
         invitation.full_name = user.full_name
         invitation.username = user.username
         invitation.phone = user.phone

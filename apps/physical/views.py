@@ -21,34 +21,28 @@ from .serializers import (
 class PhysicalQuoteViewSet(TenantScopedModelViewSet):
     queryset = PhysicalQuote.objects.select_related("tenant", "safra", "created_by").all()
     serializer_class = PhysicalQuoteSerializer
-    filterset_fields = ["tenant", "safra", "data_pgto", "data_report"]
+    filterset_fields = ["safra", "data_pgto", "data_report"]
     search_fields = ["cultura_texto", "localidade", "moeda_unidade", "obs"]
 
 
 class BudgetCostViewSet(TenantScopedModelViewSet):
     queryset = BudgetCost.objects.select_related("tenant", "subgrupo", "grupo", "cultura", "safra", "created_by").all()
     serializer_class = BudgetCostSerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "considerar_na_politica_de_hedge", "moeda"]
+    filterset_fields = ["cultura", "safra", "considerar_na_politica_de_hedge", "moeda"]
     search_fields = ["grupo_despesa", "obs"]
 
 
 class ActualCostViewSet(TenantScopedModelViewSet):
     queryset = ActualCost.objects.select_related("tenant", "subgrupo", "grupo", "cultura", "safra", "created_by").all()
     serializer_class = ActualCostSerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "subgrupo", "grupo", "cultura", "safra", "moeda", "data_travamento"]
+    filterset_fields = ["cultura", "safra", "moeda", "data_travamento"]
     search_fields = ["grupo_despesa", "obs"]
 
 
 class PhysicalSaleViewSet(TenantScopedModelViewSet):
     queryset = PhysicalSale.objects.select_related("tenant", "grupo", "subgrupo", "cultura", "safra", "contraparte", "created_by").all()
     serializer_class = PhysicalSaleSerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "grupo", "subgrupo", "cultura", "safra", "contraparte", "compra_venda", "moeda_contrato", "moeda_unidade", "bolsa_ref", "contrato_bolsa", "localidade"]
+    filterset_fields = ["cultura", "safra", "contraparte", "compra_venda", "moeda_contrato", "moeda_unidade", "bolsa_ref", "contrato_bolsa", "localidade"]
     search_fields = ["cultura_produto", "objetivo_venda_dolarizada", "localidade", "contrato_bolsa", "obs"]
 
     @action(detail=True, methods=["get", "post"], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
@@ -81,16 +75,12 @@ class PhysicalSaleViewSet(TenantScopedModelViewSet):
 class PhysicalPaymentViewSet(TenantScopedModelViewSet):
     queryset = PhysicalPayment.objects.select_related("tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "created_by").all()
     serializer_class = PhysicalPaymentSerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "unidade", "classificacao", "data_pagamento"]
+    filterset_fields = ["fazer_frente_com", "safra", "contraparte", "unidade", "classificacao", "data_pagamento"]
     search_fields = ["descricao", "classificacao", "obs"]
 
 
 class CashPaymentViewSet(TenantScopedModelViewSet):
     queryset = CashPayment.objects.select_related("tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "created_by").all()
     serializer_class = CashPaymentSerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "moeda", "data_desembolso", "data_pagamento"]
+    filterset_fields = ["fazer_frente_com", "safra", "contraparte", "moeda", "data_desembolso", "data_pagamento"]
     search_fields = ["descricao", "obs"]

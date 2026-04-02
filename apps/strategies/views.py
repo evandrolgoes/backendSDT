@@ -20,9 +20,7 @@ IBGE_CITIES_URL = "https://servicodados.ibge.gov.br/api/v1/localidades/municipio
 class StrategyViewSet(TenantScopedModelViewSet):
     queryset = Strategy.objects.select_related("tenant", "grupo", "subgrupo", "created_by").all()
     serializer_class = StrategySerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "grupo", "subgrupo", "status"]
+    filterset_fields = ["status"]
     search_fields = ["descricao_estrategia", "obs", "status"]
 
 
@@ -30,8 +28,6 @@ class StrategyTriggerViewSet(TenantScopedModelViewSet):
     queryset = StrategyTrigger.objects.select_related("estrategia", "cultura").prefetch_related("grupos", "subgrupos").all()
     serializer_class = StrategyTriggerSerializer
     tenant_field = "estrategia__tenant"
-    group_scope_fields = ("grupos",)
-    subgroup_scope_fields = ("subgrupos",)
     filterset_fields = ["estrategia", "cultura", "status_gatilho", "tipo_fis_der", "posicao"]
     search_fields = ["contrato_bolsa", "codigo_derivativo", "produto_bolsa", "status"]
 
@@ -39,18 +35,14 @@ class StrategyTriggerViewSet(TenantScopedModelViewSet):
 class HedgePolicyViewSet(TenantScopedModelViewSet):
     queryset = HedgePolicy.objects.select_related("tenant", "cultura", "safra", "created_by").prefetch_related("grupos", "subgrupos").all()
     serializer_class = HedgePolicySerializer
-    group_scope_fields = ("grupos",)
-    subgroup_scope_fields = ("subgrupos",)
-    filterset_fields = ["tenant", "cultura", "safra"]
+    filterset_fields = ["cultura", "safra"]
     search_fields = ["obs"]
 
 
 class CropBoardViewSet(TenantScopedModelViewSet):
     queryset = CropBoard.objects.select_related("tenant", "grupo", "subgrupo", "cultura", "safra", "created_by").all()
     serializer_class = CropBoardSerializer
-    group_scope_fields = ("grupo",)
-    subgroup_scope_fields = ("subgrupo",)
-    filterset_fields = ["tenant", "grupo", "subgrupo", "cultura", "safra", "monitorar_vc", "criar_politica_hedge"]
+    filterset_fields = ["cultura", "safra", "monitorar_vc", "criar_politica_hedge"]
     search_fields = ["obs", "bolsa_ref", "unidade_producao", "localidade"]
 
 

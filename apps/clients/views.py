@@ -15,7 +15,7 @@ from .serializers import (
 class ClientAccountViewSet(TenantScopedModelViewSet):
     queryset = ClientAccount.objects.select_related("tenant").all()
     serializer_class = ClientAccountSerializer
-    filterset_fields = ["tenant", "profile_type", "is_active"]
+    filterset_fields = ["profile_type", "is_active"]
     search_fields = ["name", "legal_name", "document"]
 
 
@@ -23,8 +23,7 @@ class EconomicGroupViewSet(TenantScopedModelViewSet):
     queryset = EconomicGroup.objects.select_related("tenant").all()
     serializer_class = EconomicGroupSerializer
     permission_classes = [IsMasterAdminOrTenantUser]
-    group_scope_fields = ("id",)
-    filterset_fields = ["tenant"]
+    filterset_fields = []
     search_fields = ["grupo"]
 
     def get_queryset(self):
@@ -35,8 +34,7 @@ class SubGroupViewSet(TenantScopedModelViewSet):
     queryset = SubGroup.objects.select_related("tenant", "grupo").all()
     serializer_class = SubGroupSerializer
     permission_classes = [IsMasterAdminOrTenantUser]
-    subgroup_scope_fields = ("id",)
-    filterset_fields = ["tenant"]
+    filterset_fields = []
     search_fields = ["subgrupo"]
 
     def get_queryset(self):
@@ -46,20 +44,19 @@ class SubGroupViewSet(TenantScopedModelViewSet):
 class CropSeasonViewSet(TenantScopedModelViewSet):
     queryset = CropSeason.objects.select_related("tenant").all()
     serializer_class = CropSeasonSerializer
-    filterset_fields = ["tenant"]
+    filterset_fields = []
     search_fields = ["safra"]
 
 
 class CounterpartyViewSet(TenantScopedModelViewSet):
     queryset = Counterparty.objects.select_related("tenant", "grupo").all()
     serializer_class = CounterpartySerializer
-    group_scope_fields = ("grupo",)
-    filterset_fields = ["tenant", "grupo"]
+    filterset_fields = []
     search_fields = ["contraparte", "obs"]
 
 
 class BrokerViewSet(TenantScopedModelViewSet):
     queryset = Broker.objects.select_related("tenant").all()
     serializer_class = BrokerSerializer
-    filterset_fields = ["tenant"]
+    filterset_fields = []
     search_fields = ["name"]

@@ -4,12 +4,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.core.group_access import apply_queryset_assignment_scope
 from apps.core.viewsets import TenantScopedModelViewSet
 from apps.derivatives.models import DerivativeOperation
 from apps.mercado.models import MarketNewsPost
 from apps.mercado.serializers import MarketNewsPostSerializer
 from apps.physical.models import BudgetCost, CashPayment, PhysicalPayment, PhysicalQuote, PhysicalSale
+from apps.core.privacy import apply_group_privacy_scope
 from apps.strategies.models import CropBoard, HedgePolicy
 from apps.tradingview_scraper.models import TradingViewWatchlistQuote
 from apps.tradingview_scraper.serializers import TradingViewWatchlistQuoteSerializer
@@ -22,9 +22,7 @@ from .serializers import ExposurePositionSerializer
 class ExposurePositionViewSet(TenantScopedModelViewSet):
     queryset = ExposurePosition.objects.select_related("tenant", "client", "group", "subgroup", "crop", "season").all()
     serializer_class = ExposurePositionSerializer
-    group_scope_fields = ("group",)
-    subgroup_scope_fields = ("subgroup",)
-    filterset_fields = ["tenant", "client", "group", "subgroup", "crop", "season", "reference_date"]
+    filterset_fields = ["client", "crop", "season", "reference_date"]
 
 
 def _normalize_text(value):
@@ -58,19 +56,7 @@ def _parse_multi_value_param(request, key):
 
 
 def _scope_queryset(queryset, user, group_fields=(), subgroup_fields=()):
-    if user.is_superuser:
-        return queryset
-
-    accessible_tenant_ids = getattr(user, "get_accessible_tenant_ids", lambda: [getattr(user, "tenant_id", None)])()
-    if hasattr(queryset.model, "tenant_id"):
-        queryset = queryset.filter(tenant_id__in=accessible_tenant_ids)
-
-    return apply_queryset_assignment_scope(
-        queryset,
-        user,
-        group_fields=group_fields,
-        subgroup_fields=subgroup_fields,
-    )
+    return apply_group_privacy_scope(queryset, user, group_fields=group_fields, subgroup_fields=subgroup_fields)
 
 
 def _apply_common_dashboard_filters(queryset, request, *, group_fields=(), subgroup_fields=(), culture_fields=(), season_fields=()):
