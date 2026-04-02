@@ -111,6 +111,8 @@ class UserSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     accessible_groups = serializers.PrimaryKeyRelatedField(many=True, queryset=EconomicGroup.objects.all(), required=False)
     accessible_subgroups = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
+    accessible_groups_display = serializers.SerializerMethodField()
+    accessible_subgroups_display = serializers.SerializerMethodField()
     allowed_modules = serializers.ListField(
         child=serializers.ChoiceField(choices=AVAILABLE_MODULE_CHOICES),
         required=False,
@@ -197,7 +199,9 @@ class UserSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
             "max_owned_subgroups",
             "scope_access_level",
             "accessible_groups",
+            "accessible_groups_display",
             "accessible_subgroups",
+            "accessible_subgroups_display",
             "allowed_modules",
             "access_status",
             "is_active",
@@ -220,6 +224,12 @@ class UserSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
 
     def get_owned_subgroups_count(self, obj):
         return obj.get_owned_subgroups_count()
+
+    def get_accessible_groups_display(self, obj):
+        return list(obj.accessible_groups.order_by("grupo", "id").values_list("grupo", flat=True))
+
+    def get_accessible_subgroups_display(self, obj):
+        return list(obj.accessible_subgroups.order_by("subgrupo", "id").values_list("subgrupo", flat=True))
 
     def get_tenant_requires_master_user(self, obj):
         return _tenant_requires_master_user(getattr(obj, "tenant", None))
