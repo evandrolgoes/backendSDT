@@ -8,9 +8,18 @@ from apps.physical.models import PhysicalSale
 
 class UserScopeFlowTests(TestCase):
     def setUp(self):
+        self.admin_tenant = Tenant.objects.create(name="Administradores", slug="admin")
         self.client_tenant = Tenant.objects.create(name="Cliente", slug="cliente")
         self.user_tenant = Tenant.objects.create(name="Usuarios", slug="usuario")
 
+        self.admin_user = User.objects.create_user(
+            username="admin_owner",
+            email="admin@example.com",
+            password="secret123",
+            full_name="Admin Sistema",
+            tenant=self.admin_tenant,
+            role=User.Role.OWNER,
+        )
         self.owner = User.objects.create_user(
             username="owner",
             email="owner@example.com",
@@ -104,6 +113,59 @@ class UserScopeFlowTests(TestCase):
         managed_user.refresh_from_db()
         self.assertSetEqual(set(managed_user.assigned_groups.values_list("id", flat=True)), {self.group_a.id})
         self.assertSetEqual(set(managed_user.assigned_subgroups.values_list("id", flat=True)), {self.subgroup_a.id})
+
+    def test_non_admin_user_cannot_manage_users_from_another_wallet_in_same_tenant(self):
+        other_owner = User.objects.create_user(
+            username="other_owner",
+            email="other_owner@example.com",
+            password="secret123",
+            full_name="Outro Owner",
+            tenant=self.client_tenant,
+            role=User.Role.OWNER,
+        )
+
+        self.api_client.force_authenticate(user=self.owner)
+
+        list_response = self.api_client.get("/api/users/")
+        self.assertEqual(list_response.status_code, 200, list_response.data)
+        listed_ids = {item["id"] for item in list_response.data["results"]}
+        self.assertNotIn(other_owner.id, listed_ids)
+
+        patch_response = self.api_client.patch(
+            f"/api/users/{other_owner.id}/",
+            {"full_name": "Nao deveria editar"},
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, 404, patch_response.data)
+
+    def test_admin_tenant_user_can_manage_users_from_any_wallet(self):
+        external_user = User.objects.create_user(
+            username="external_user",
+            email="external@example.com",
+            password="secret123",
+            full_name="Usuario Externo",
+            tenant=self.user_tenant,
+            master_user=self.owner,
+            role=User.Role.STAFF,
+        )
+
+        self.api_client.force_authenticate(user=self.admin_user)
+
+        list_response = self.api_client.get("/api/users/")
+        self.assertEqual(list_response.status_code, 200, list_response.data)
+        listed_ids = {item["id"] for item in list_response.data["results"]}
+        self.assertIn(external_user.id, listed_ids)
+        self.assertIn(self.owner.id, listed_ids)
+
+        patch_response = self.api_client.patch(
+            f"/api/users/{external_user.id}/",
+            {"full_name": "Usuario Editado Pelo Admin"},
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, 200, patch_response.data)
+
+        external_user.refresh_from_db()
+        self.assertEqual(external_user.full_name, "Usuario Editado Pelo Admin")
 
     def test_scoped_user_only_sees_allowed_groups_subgroups_and_sales(self):
         scoped_user = User.objects.create_user(

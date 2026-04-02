@@ -132,9 +132,7 @@ class UserViewSet(TenantScopedModelViewSet):
         if self.request.user.has_tenant_slug("admin"):
             return queryset
         root_user = self.request.user.get_master_root()
-        if self.request.user.has_tenant_slug("consultor"):
-            return queryset.filter(models.Q(tenant=self.request.user.tenant) | models.Q(tenant__slug="usuario", master_user=root_user))
-        return queryset.filter(models.Q(tenant=self.request.user.tenant) | models.Q(tenant__slug="usuario", master_user=root_user))
+        return queryset.filter(models.Q(id=root_user.id) | models.Q(master_user=root_user))
 
 class ImpersonateUserView(APIView):
     permission_classes = [IsMasterAdminOrTenantManager]

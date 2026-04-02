@@ -135,7 +135,7 @@ class UserSerializer(serializers.ModelSerializer):
     def _actor_can_choose_tenant(self, actor):
         if not actor or not getattr(actor, "is_authenticated", False):
             return False
-        return bool(actor.is_superuser or actor.has_tenant_slug("admin", "consultor"))
+        return bool(actor.is_superuser or actor.has_tenant_slug("admin"))
 
     def get_fields(self):
         fields = super().get_fields()
