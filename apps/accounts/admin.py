@@ -61,17 +61,7 @@ class UserAdminForm(forms.ModelForm):
         if commit:
             user.accessible_groups.set(self.cleaned_data.get("economic_groups", []))
             user.accessible_subgroups.set(self.cleaned_data.get("subgroups", []))
-        else:
-            self._pending_economic_groups = self.cleaned_data.get("economic_groups", [])
-            self._pending_subgroups = self.cleaned_data.get("subgroups", [])
         return user
-
-    def save_m2m(self):
-        super().save_m2m()
-        if hasattr(self, "_pending_economic_groups") and self.instance.pk:
-            self.instance.accessible_groups.set(self._pending_economic_groups)
-        if hasattr(self, "_pending_subgroups") and self.instance.pk:
-            self.instance.accessible_subgroups.set(self._pending_subgroups)
 
 
 @admin.register(Tenant)
@@ -169,6 +159,12 @@ class UserAdmin(DjangoUserAdmin):
         ),
     )
     filter_horizontal = ()
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if form.instance.pk:
+            form.instance.accessible_groups.set(form.cleaned_data.get("economic_groups", []))
+            form.instance.accessible_subgroups.set(form.cleaned_data.get("subgroups", []))
 
 
 @admin.register(Invitation)

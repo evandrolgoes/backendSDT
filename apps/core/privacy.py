@@ -39,11 +39,9 @@ def get_user_privacy_scope(user):
         setattr(user, "_privacy_scope_cache", scope)
         return scope
 
-    group_ids = set(
-        user.accessible_groups.filter(tenant_id=user.tenant_id).values_list("id", flat=True)
-    )
+    group_ids = set(user.accessible_groups.values_list("id", flat=True))
     subgroup_rows = list(
-        user.accessible_subgroups.filter(tenant_id=user.tenant_id).values_list("id", "grupo_id")
+        user.accessible_subgroups.values_list("id", "grupo_id")
     )
     subgroup_ids = {subgroup_id for subgroup_id, _group_id in subgroup_rows}
     group_ids.update(group_id for _subgroup_id, group_id in subgroup_rows if group_id)

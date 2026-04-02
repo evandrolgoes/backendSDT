@@ -228,3 +228,36 @@ class GroupPrivacyScopeTests(TestCase):
         row = response.data["results"][0]
         self.assertEqual(row["grupos"], [self.allowed_group.id])
         self.assertEqual(row["subgrupos"], [self.allowed_subgroup.id])
+
+    def test_usuario_tenant_user_keeps_group_scope_from_access_lists_even_with_different_tenant(self):
+        usuario_tenant = Tenant.objects.create(name="Usuarios", slug="usuario")
+        carteira_user = User.objects.create_user(
+            username="carteira_scope",
+            email="carteira_scope@example.com",
+            password="secret123",
+            full_name="Carteira Scope",
+            tenant=self.tenant,
+            role=User.Role.OWNER,
+        )
+        usuario = User.objects.create_user(
+            username="usuario_scope",
+            email="usuario_scope@example.com",
+            password="secret123",
+            full_name="Usuario Scope",
+            tenant=usuario_tenant,
+            master_user=carteira_user,
+            role=User.Role.STAFF,
+        )
+        usuario.accessible_groups.set([self.allowed_group])
+        usuario.accessible_subgroups.set([self.allowed_subgroup])
+
+        client = APIClient()
+        client.force_authenticate(user=usuario)
+
+        group_response = client.get("/api/groups/")
+        self.assertEqual(group_response.status_code, 200, group_response.data)
+        self.assertEqual([item["id"] for item in group_response.data["results"]], [self.allowed_group.id])
+
+        subgroup_response = client.get("/api/subgroups/")
+        self.assertEqual(subgroup_response.status_code, 200, subgroup_response.data)
+        self.assertEqual([item["id"] for item in subgroup_response.data["results"]], [self.allowed_subgroup.id])
