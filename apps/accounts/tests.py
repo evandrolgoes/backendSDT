@@ -114,6 +114,30 @@ class UserScopeFlowTests(TestCase):
         self.assertSetEqual(set(managed_user.assigned_groups.values_list("id", flat=True)), {self.group_a.id})
         self.assertSetEqual(set(managed_user.assigned_subgroups.values_list("id", flat=True)), {self.subgroup_a.id})
 
+    def test_managed_user_without_wallet_returns_master_user_error_before_group_scope_error(self):
+        managed_user = User.objects.create_user(
+            username="walletless_user",
+            email="walletless@example.com",
+            password="secret123",
+            full_name="Usuario Sem Carteira",
+            tenant=self.user_tenant,
+            role=User.Role.STAFF,
+        )
+
+        self.api_client.force_authenticate(user=self.superuser)
+        response = self.api_client.patch(
+            f"/api/users/{managed_user.id}/",
+            {
+                "tenant": self.user_tenant.id,
+                "assigned_groups": [self.group_a.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("master_user", response.data)
+        self.assertNotIn("assigned_groups", response.data)
+
     def test_non_admin_user_cannot_manage_users_from_another_wallet_in_same_tenant(self):
         other_owner = User.objects.create_user(
             username="other_owner",
@@ -166,6 +190,30 @@ class UserScopeFlowTests(TestCase):
 
         external_user.refresh_from_db()
         self.assertEqual(external_user.full_name, "Usuario Editado Pelo Admin")
+
+    def test_admin_invitation_for_usuario_uses_wallet_scope_for_groups(self):
+        self.api_client.force_authenticate(user=self.admin_user)
+
+        response = self.api_client.post(
+            "/api/admin-invitations/",
+            {
+                "target_tenant_slug": "usuario",
+                "master_user": self.owner.id,
+                "full_name": "Convidado Admin",
+                "email": "admin.scope@example.com",
+                "access_status": User.AccessStatus.ACTIVE,
+                "assigned_groups": [self.group_a.id],
+                "assigned_subgroups": [self.subgroup_a.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+        invitation = Invitation.objects.get(email="admin.scope@example.com")
+        self.assertEqual(invitation.master_user, self.owner)
+        self.assertSetEqual(set(invitation.assigned_groups.values_list("id", flat=True)), {self.group_a.id})
+        self.assertSetEqual(set(invitation.assigned_subgroups.values_list("id", flat=True)), {self.subgroup_a.id})
 
     def test_scoped_user_only_sees_allowed_groups_subgroups_and_sales(self):
         scoped_user = User.objects.create_user(

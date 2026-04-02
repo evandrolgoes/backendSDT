@@ -51,6 +51,39 @@ def _configure_scope_field_querysets(fields, actor):
         fields["assigned_subgroups"].queryset = subgroup_queryset
 
 
+def _normalize_master_user(master_user):
+    if master_user is None:
+        return None
+    return getattr(master_user, "get_master_root", lambda: master_user)()
+
+
+def _tenant_requires_master_user(tenant):
+    return bool(tenant and (getattr(tenant, "requires_master_user", False) or getattr(tenant, "slug", "") == "usuario"))
+
+
+def _get_available_master_user_queryset(actor):
+    queryset = User.objects.filter(master_user__isnull=True, tenant_id__isnull=False).exclude(tenant__slug="usuario")
+    if not actor or not getattr(actor, "is_authenticated", False):
+        return queryset.none()
+    if actor.is_superuser or actor.has_tenant_slug("admin"):
+        return queryset
+    root_user = _normalize_master_user(actor)
+    if not getattr(root_user, "pk", None):
+        return queryset.none()
+    return queryset.filter(pk=root_user.pk)
+
+
+def _validate_master_user_access(actor, master_user):
+    if master_user is None or not actor or not getattr(actor, "is_authenticated", False):
+        return
+    if actor.is_superuser or actor.has_tenant_slug("admin"):
+        return
+    actor_root = _normalize_master_user(actor)
+    target_root = _normalize_master_user(master_user)
+    if getattr(actor_root, "pk", None) != getattr(target_root, "pk", None):
+        raise serializers.ValidationError({"master_user": "A carteira selecionada precisa pertencer ao mesmo contexto do usuario."})
+
+
 def _validate_scope_assignments(*, tenant, groups, subgroups):
     if tenant is None:
         return
@@ -58,9 +91,9 @@ def _validate_scope_assignments(*, tenant, groups, subgroups):
     invalid_group = any(item.tenant_id != tenant.id for item in groups or [])
     invalid_subgroup = any(item.tenant_id != tenant.id for item in subgroups or [])
     if invalid_group:
-        raise serializers.ValidationError({"assigned_groups": "Todos os grupos selecionados precisam pertencer ao mesmo tenant."})
+        raise serializers.ValidationError({"assigned_groups": "Todos os grupos selecionados precisam pertencer ao mesmo contexto de acesso do usuario."})
     if invalid_subgroup:
-        raise serializers.ValidationError({"assigned_subgroups": "Todos os subgrupos selecionados precisam pertencer ao mesmo tenant."})
+        raise serializers.ValidationError({"assigned_subgroups": "Todos os subgrupos selecionados precisam pertencer ao mesmo contexto de acesso do usuario."})
 
 
 def _resolve_scope_source_tenant(tenant, master_user=None):
@@ -119,7 +152,7 @@ class UserSerializer(serializers.ModelSerializer):
     assigned_subgroups = serializers.PrimaryKeyRelatedField(many=True, queryset=SubGroup.objects.all(), required=False)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     tenant_slug = serializers.CharField(source="tenant.slug", read_only=True)
-    tenant_requires_master_user = serializers.BooleanField(source="tenant.requires_master_user", read_only=True)
+    tenant_requires_master_user = serializers.SerializerMethodField()
     tenant_can_send_invitations = serializers.BooleanField(source="tenant.can_send_invitations", read_only=True)
     tenant_can_register_groups = serializers.BooleanField(source="tenant.can_register_groups", read_only=True)
     tenant_can_register_subgroups = serializers.BooleanField(source="tenant.can_register_subgroups", read_only=True)
@@ -144,6 +177,7 @@ class UserSerializer(serializers.ModelSerializer):
         if request and getattr(actor, "is_authenticated", False) and "tenant" in fields and not self._actor_can_choose_tenant(actor):
             default_tenant = self.instance.tenant if isinstance(self.instance, User) and self.instance.tenant_id else request.user.tenant
             fields["tenant"] = serializers.HiddenField(default=default_tenant)
+        master_user_queryset = _get_available_master_user_queryset(actor)
         tenant = None
         instance_obj = self.instance if isinstance(self.instance, User) else None
         if instance_obj is not None and instance_obj.tenant_id:
@@ -151,12 +185,12 @@ class UserSerializer(serializers.ModelSerializer):
         elif request and getattr(actor, "is_authenticated", False) and not self._actor_can_choose_tenant(actor):
             tenant = actor.tenant
         if tenant is not None:
-            if getattr(tenant, "requires_master_user", False):
-                fields["master_user"].queryset = User.objects.all()
+            if _tenant_requires_master_user(tenant):
+                fields["master_user"].queryset = master_user_queryset
             else:
                 fields["master_user"].queryset = User.objects.none()
         if request and getattr(actor, "is_authenticated", False) and self._actor_can_choose_tenant(actor):
-            fields["master_user"].queryset = User.objects.all()
+            fields["master_user"].queryset = master_user_queryset
         _configure_scope_field_querysets(fields, actor)
         return fields
 
@@ -209,6 +243,9 @@ class UserSerializer(serializers.ModelSerializer):
     def get_owned_subgroups_count(self, obj):
         return obj.get_owned_subgroups_count()
 
+    def get_tenant_requires_master_user(self, obj):
+        return _tenant_requires_master_user(getattr(obj, "tenant", None))
+
     def validate_tenant(self, value):
         request = self.context["request"]
         if not getattr(request.user, "is_authenticated", False):
@@ -233,9 +270,9 @@ class UserSerializer(serializers.ModelSerializer):
         validated_data["allowed_modules"] = []
         validated_data.setdefault("role", User.Role.STAFF)
         tenant = validated_data.get("tenant")
-        if tenant and getattr(tenant, "requires_master_user", False) and not validated_data.get("master_user") and getattr(request.user, "is_authenticated", False):
+        if tenant and _tenant_requires_master_user(tenant) and not validated_data.get("master_user") and getattr(request.user, "is_authenticated", False):
             validated_data["master_user"] = request.user.get_master_root()
-        elif tenant and not getattr(tenant, "requires_master_user", False):
+        elif tenant and not _tenant_requires_master_user(tenant):
             validated_data["master_user"] = None
         user = User(**validated_data)
         if password:
@@ -277,6 +314,20 @@ class UserSerializer(serializers.ModelSerializer):
         master_user = attrs["master_user"] if "master_user" in attrs else None
         if "master_user" not in attrs and self.instance is not None:
             master_user = self.instance.master_user
+        master_user = _normalize_master_user(master_user)
+        if master_user is not None:
+            attrs["master_user"] = master_user
+        if tenant is not None:
+            if _tenant_requires_master_user(tenant):
+                if not master_user and request and getattr(request.user, "is_authenticated", False) and not self._actor_can_choose_tenant(request.user):
+                    master_user = _normalize_master_user(request.user)
+                    attrs["master_user"] = master_user
+                if not master_user:
+                    raise serializers.ValidationError({"master_user": "Usuarios deste perfil precisam ter uma carteira vinculada."})
+                _validate_master_user_access(getattr(request, "user", None), master_user)
+            else:
+                attrs["master_user"] = None
+                master_user = None
         groups = attrs["assigned_groups"] if "assigned_groups" in attrs else (self.instance.assigned_groups.all() if self.instance else [])
         subgroups = attrs["assigned_subgroups"] if "assigned_subgroups" in attrs else (self.instance.assigned_subgroups.all() if self.instance else [])
         _validate_scope_assignments(
@@ -284,15 +335,6 @@ class UserSerializer(serializers.ModelSerializer):
             groups=groups,
             subgroups=subgroups,
         )
-        if tenant is not None:
-            if getattr(tenant, "requires_master_user", False):
-                if not master_user and request and getattr(request.user, "is_authenticated", False) and self._actor_can_choose_tenant(request.user):
-                    master_user = request.user.get_master_root()
-                    attrs["master_user"] = master_user
-                if not master_user:
-                    raise serializers.ValidationError({"master_user": "Usuarios deste tenant devem ter uma carteira vinculada."})
-            else:
-                attrs["master_user"] = None
         return attrs
 
 
@@ -371,9 +413,7 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
         fields = super().get_fields()
         request = self.context.get("request")
         actor = getattr(request, "user", None)
-        if request and getattr(actor, "is_authenticated", False) and not actor.is_superuser:
-            tenant_ids = actor.get_accessible_tenant_ids()
-            fields["master_user"].queryset = User.objects.filter(tenant_id__in=tenant_ids)
+        fields["master_user"].queryset = _get_available_master_user_queryset(actor)
         _configure_scope_field_querysets(fields, actor)
         return fields
 
@@ -422,7 +462,7 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
                     attrs["target_tenant_slug"] = "usuario"
                     attrs["target_tenant_name"] = Tenant.objects.filter(slug="usuario").values_list("name", flat=True).first() or "usuario"
                     target_tenant_slug = "usuario"
-                    attrs["master_user"] = request_user
+                    attrs["master_user"] = _normalize_master_user(request_user)
                 else:
                     target_tenant_slug = slugify(attrs.get("target_tenant_slug") or getattr(self.instance, "target_tenant_slug", ""))
             else:
@@ -436,15 +476,32 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
             attrs["target_tenant_name"] = target_tenant.name
         attrs["username"] = (attrs.get("username") or getattr(self.instance, "username", "")).strip()
 
-        if request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
-            accessible_tenant_ids = set(request_user.get_accessible_tenant_ids())
-            master_user = attrs.get("master_user")
-            if master_user and master_user.tenant_id not in accessible_tenant_ids:
-                raise serializers.ValidationError({"master_user": "A carteira selecionada nao pertence ao escopo permitido."})
+        master_user = attrs.get("master_user")
+        if master_user is None and self.instance is not None:
+            master_user = self.instance.master_user
+        master_user = _normalize_master_user(master_user)
+        if master_user is not None:
+            attrs["master_user"] = master_user
+        _validate_master_user_access(request_user, master_user)
+
+        scope_tenant = tenant
+        if invitation_kind == Invitation.Kind.PLATFORM_ADMIN:
+            scope_tenant = target_tenant
+        if scope_tenant is not None:
+            if _tenant_requires_master_user(scope_tenant):
+                if not master_user:
+                    raise serializers.ValidationError({"master_user": "Convites deste perfil precisam ter uma carteira vinculada."})
+            else:
+                attrs["master_user"] = None
+                master_user = None
 
         groups = attrs.get("assigned_groups", self.instance.assigned_groups.all() if self.instance else [])
         subgroups = attrs.get("assigned_subgroups", self.instance.assigned_subgroups.all() if self.instance else [])
-        _validate_scope_assignments(tenant=tenant, groups=groups, subgroups=subgroups)
+        _validate_scope_assignments(
+            tenant=_resolve_scope_source_tenant(scope_tenant, master_user),
+            groups=groups,
+            subgroups=subgroups,
+        )
 
         if request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
             if invitation_kind == Invitation.Kind.PLATFORM_ADMIN:
