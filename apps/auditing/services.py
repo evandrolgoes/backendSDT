@@ -95,7 +95,6 @@ def create_audit_log(action, instance, *, before=None, after=None, user=None):
         content_type=ContentType.objects.get_for_model(instance.__class__),
         object_id=instance.pk,
         action=action,
-        alteracoes=changes,
-        changes_json={"before": before, "after": after},
+        changes_json={"before": before, "after": after, "changes": changes},
         description=build_log_description(action, formulario, changes),
     )

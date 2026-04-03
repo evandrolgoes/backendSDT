@@ -1,9 +1,14 @@
 from rest_framework import generics, permissions, response, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import MethodNotAllowed, PermissionDenied
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    scope = "login"
 
 from apps.core.permissions import (
     IsMasterAdmin,
@@ -32,6 +37,7 @@ from .serializers import (
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
+    throttle_classes = [LoginRateThrottle]
 
     def get(self, request, *args, **kwargs):
         return response.Response(

@@ -1,10 +1,14 @@
-from django.http import JsonResponse
+import urllib.request
+import urllib.parse
+
+from django.http import JsonResponse, HttpResponse
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from rest_framework import parsers, status
 from rest_framework.decorators import action
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.auditing.context import suppress_audit_signals
 from apps.auditing.models import Attachment
@@ -13,10 +17,55 @@ from apps.core.viewsets import TenantScopedModelViewSet
 
 from .models import MarketNewsPost
 from .serializers import MarketNewsPostListSerializer, MarketNewsPostSerializer
+from .services import build_fund_position_payload
 
 
 def mercado_health(_request):
     return JsonResponse({"status": "ok", "app": "mercado"})
+
+
+ALLOWED_YAHOO_SYMBOLS = {
+    "ZS=F", "ZC=F", "ZW=F", "ZM=F", "ZL=F", "SB=F",
+}
+
+
+def yahoo_finance_proxy(request):
+    symbol = request.GET.get("symbol", "").strip()
+    period1 = request.GET.get("period1", "").strip()
+    period2 = request.GET.get("period2", "").strip()
+
+    if not symbol or not period1 or not period2:
+        return JsonResponse({"error": "Missing parameters"}, status=400)
+
+    if symbol not in ALLOWED_YAHOO_SYMBOLS:
+        return JsonResponse({"error": "Symbol not allowed"}, status=400)
+
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}"
+        f"?period1={period1}&period2={period2}&interval=1d&includePrePost=false&events=history"
+    )
+
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            data = response.read()
+        return HttpResponse(data, content_type="application/json")
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)}, status=502)
+
+
+class FundPositionSeriesView(APIView):
+    def get(self, request, *args, **kwargs):
+        series_id = request.query_params.get("series", "soja")
+        try:
+            payload = build_fund_position_payload(series_id=series_id)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class MarketNewsPostPermission(BasePermission):

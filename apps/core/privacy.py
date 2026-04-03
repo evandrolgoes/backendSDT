@@ -61,7 +61,7 @@ def get_accessible_group_queryset(user):
     from apps.clients.models import EconomicGroup
 
     scope = get_user_privacy_scope(user)
-    queryset = EconomicGroup.objects.all().order_by("grupo", "id")
+    queryset = EconomicGroup.objects.select_related("tenant").order_by("grupo", "id")
     if not scope["enabled"]:
         return queryset
     return queryset.filter(id__in=scope["group_ids"])
@@ -71,7 +71,7 @@ def get_accessible_subgroup_queryset(user):
     from apps.clients.models import SubGroup
 
     scope = get_user_privacy_scope(user)
-    queryset = SubGroup.objects.select_related("grupo").all().order_by("grupo__grupo", "subgrupo", "id")
+    queryset = SubGroup.objects.select_related("grupo", "tenant").order_by("grupo__grupo", "subgrupo", "id")
     if not scope["enabled"]:
         return queryset
     return queryset.filter(id__in=scope["subgroup_ids"])

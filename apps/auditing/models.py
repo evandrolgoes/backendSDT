@@ -3,9 +3,20 @@ import mimetypes
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.core.models import TenantAwareModel, TimeStampedModel
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_UPLOAD_MIME_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/csv",
+}
 
 
 class AuditLog(TenantAwareModel):
@@ -15,7 +26,6 @@ class AuditLog(TenantAwareModel):
     object_id = models.PositiveBigIntegerField()
     content_object = GenericForeignKey("content_type", "object_id")
     action = models.CharField(max_length=50)
-    alteracoes = models.JSONField(default=list, blank=True)
     changes_json = models.JSONField(default=dict, blank=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -55,6 +65,14 @@ class Attachment(TenantAwareModel, TimeStampedModel):
 
     @classmethod
     def create_from_upload(cls, *, tenant, uploaded_by, content_type, object_id, uploaded_file):
+        file_size = getattr(uploaded_file, "size", None)
+        if file_size is not None and file_size > MAX_UPLOAD_SIZE:
+            raise ValidationError(f"Arquivo excede o tamanho maximo permitido de {MAX_UPLOAD_SIZE // (1024 * 1024)} MB.")
+
+        guessed_mime = getattr(uploaded_file, "content_type", "") or mimetypes.guess_type(getattr(uploaded_file, "name", "") or "")[0] or ""
+        if guessed_mime and guessed_mime not in ALLOWED_UPLOAD_MIME_TYPES:
+            raise ValidationError(f"Tipo de arquivo nao permitido: {guessed_mime}.")
+
         attachment = cls(
             tenant=tenant,
             uploaded_by=uploaded_by,
