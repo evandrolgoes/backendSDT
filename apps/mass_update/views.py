@@ -171,14 +171,86 @@ def _normalize_filter_conditions(filters):
     return []
 
 
-def _apply_filters(queryset, filters, filter_field_map):
+def _normalize_text_match(value):
+    return str(value or "").strip().casefold()
+
+
+def _get_relation_candidate_attrs(field_meta, serializer_field):
+    candidates = [field_meta.get("labelKey"), field_meta.get("valueKey")]
+    queryset = getattr(serializer_field, "queryset", None)
+    model = getattr(queryset, "model", None)
+    if model is not None:
+        for candidate in ("nome", "name", "title", "grupo", "subgrupo", "ativo", "safra", "contraparte", "username", "email", "full_name"):
+            try:
+                model._meta.get_field(candidate)
+                candidates.append(candidate)
+            except Exception:
+                continue
+    unique_candidates = []
+    for candidate in candidates:
+        if candidate and candidate not in unique_candidates:
+            unique_candidates.append(candidate)
+    return unique_candidates
+
+
+def _coerce_scalar_value(raw_value, serializer_field, field_meta):
+    if raw_value in ("", None):
+        return raw_value
+
+    if isinstance(serializer_field, serializers.BooleanField):
+        normalized = _normalize_text_match(raw_value)
+        if normalized in {"true", "1", "sim", "yes"}:
+            return True
+        if normalized in {"false", "0", "nao", "não", "no"}:
+            return False
+        return raw_value
+
+    if isinstance(serializer_field, serializers.ChoiceField):
+        normalized = _normalize_text_match(raw_value)
+        for key, label in serializer_field.choices.items():
+            if normalized in {_normalize_text_match(key), _normalize_text_match(label)}:
+                return key
+        return raw_value
+
+    if isinstance(serializer_field, serializers.PrimaryKeyRelatedField):
+        queryset = getattr(serializer_field, "queryset", None)
+        if queryset is None:
+            return raw_value
+
+        raw_text = str(raw_value).strip()
+        if raw_text.isdigit():
+            instance = queryset.filter(pk=int(raw_text)).first()
+            if instance is not None:
+                return instance.pk
+
+        for attr_name in _get_relation_candidate_attrs(field_meta, serializer_field):
+            instance = queryset.filter(**{f"{attr_name}__iexact": raw_text}).first()
+            if instance is not None:
+                return instance.pk
+        return raw_value
+
+    return raw_value
+
+
+def _coerce_field_value(raw_value, serializer_field, field_meta):
+    if isinstance(raw_value, list):
+        return [
+            item
+            for item in (_coerce_scalar_value(value, serializer_field, field_meta) for value in raw_value)
+            if item not in ("", None)
+        ]
+    return _coerce_scalar_value(raw_value, serializer_field, field_meta)
+
+
+def _apply_filters(queryset, filters, filter_field_map, serializer_field_map):
     for item in _normalize_filter_conditions(filters):
         field_name = item.get("field")
         if not field_name or field_name not in filter_field_map:
             continue
 
         field_meta = filter_field_map[field_name]
-        normalized = _normalize_filter_value(item.get("value"))
+        serializer_field = serializer_field_map.get(field_name)
+        normalized = _normalize_filter_value(_coerce_field_value(item.get("value"), serializer_field, field_meta))
         if normalized in ("", None, []):
             continue
 
@@ -205,11 +277,13 @@ def _apply_search(queryset, viewset_class, search_term):
     return queryset.filter(query)
 
 
-def _apply_update_match_filters(queryset, updates):
+def _apply_update_match_filters(queryset, updates, update_field_map, serializer_field_map):
     for update in updates or []:
         field_name = update.get("field")
         match_current = bool(update.get("matchCurrent"))
-        from_value = update.get("fromValue")
+        serializer_field = serializer_field_map.get(field_name)
+        field_meta = update_field_map.get(field_name, {})
+        from_value = _coerce_field_value(update.get("fromValue"), serializer_field, field_meta)
         if not field_name or not match_current:
             continue
         if isinstance(from_value, list):
@@ -400,13 +474,15 @@ def _get_filtered_queryset(request, resource, filters, search_term, updates):
     queryset = _get_base_queryset(config["viewset"], request)
     metadata = _build_resource_metadata(resource, config, request)
     filter_field_map = {item["name"]: item for item in metadata["filters"]}
-    queryset = _apply_filters(queryset, filters, filter_field_map)
+    update_field_map = {item["name"]: item for item in metadata["updateFields"]}
+    serializer_field_map = _get_serializer(config["viewset"], request).fields
+    queryset = _apply_filters(queryset, filters, filter_field_map, serializer_field_map)
     queryset = _apply_search(queryset, config["viewset"], search_term)
-    queryset = _apply_update_match_filters(queryset, updates)
+    queryset = _apply_update_match_filters(queryset, updates, update_field_map, serializer_field_map)
     return queryset.distinct(), config
 
 
-def _build_payload(updates):
+def _build_payload(updates, serializer_field_map, update_field_map):
     payload = {}
     for update in updates or []:
         field_name = update.get("field")
@@ -415,7 +491,9 @@ def _build_payload(updates):
         if update.get("clearTarget"):
             payload[field_name] = None
             continue
-        payload[field_name] = update.get("toValue")
+        serializer_field = serializer_field_map.get(field_name)
+        field_meta = update_field_map.get(field_name, {})
+        payload[field_name] = _coerce_field_value(update.get("toValue"), serializer_field, field_meta)
     return payload
 
 
@@ -556,7 +634,10 @@ class MassUpdateApplyView(APIView):
             raise serializers.ValidationError({"updates": "Informe pelo menos uma alteracao."})
 
         queryset, config = _get_filtered_queryset(request, resource, filters, search_term, updates)
-        payload = _build_payload(updates)
+        metadata = _build_resource_metadata(resource, config, request)
+        update_field_map = {item["name"]: item for item in metadata["updateFields"]}
+        serializer_field_map = _get_serializer(config["viewset"], request).fields
+        payload = _build_payload(updates, serializer_field_map, update_field_map)
         if not payload:
             raise serializers.ValidationError({"updates": "Nao foi possivel montar as alteracoes solicitadas."})
 
