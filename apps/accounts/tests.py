@@ -203,7 +203,6 @@ class GroupPrivacyScopeTests(TestCase):
             "subgrupo": [str(self.allowed_subgroup.id), str(self.blocked_subgroup.id)],
             "cultura": [],
             "safra": [],
-            "localidade": [],
         }
         self.user.save(update_fields=["dashboard_filter"])
 

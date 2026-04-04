@@ -164,7 +164,6 @@ def sanitize_dashboard_filter(user, dashboard_filter):
             "subgrupo": [str(item) for item in (data.get("subgrupo") or []) if item not in (None, "")],
             "cultura": [str(item) for item in (data.get("cultura") or []) if item not in (None, "")],
             "safra": [str(item) for item in (data.get("safra") or []) if item not in (None, "")],
-            "localidade": [str(item) for item in (data.get("localidade") or []) if item not in (None, "")],
         }
 
     return {
@@ -172,5 +171,4 @@ def sanitize_dashboard_filter(user, dashboard_filter):
         "subgrupo": [str(item) for item in (data.get("subgrupo") or []) if str(item) in scope["subgroup_values"]],
         "cultura": [str(item) for item in (data.get("cultura") or []) if item not in (None, "")],
         "safra": [str(item) for item in (data.get("safra") or []) if item not in (None, "")],
-        "localidade": [str(item) for item in (data.get("localidade") or []) if item not in (None, "")],
     }

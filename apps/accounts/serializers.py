@@ -335,7 +335,6 @@ class DashboardFilterSerializer(serializers.Serializer):
     subgrupo = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     cultura = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     safra = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    localidade = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
 
     def to_representation(self, instance):
         data = instance if isinstance(instance, dict) else {}
@@ -344,7 +343,6 @@ class DashboardFilterSerializer(serializers.Serializer):
             "subgrupo": [str(item) for item in (data.get("subgrupo") or []) if item not in (None, "")],
             "cultura": [str(item) for item in (data.get("cultura") or []) if item not in (None, "")],
             "safra": [str(item) for item in (data.get("safra") or []) if item not in (None, "")],
-            "localidade": [str(item) for item in (data.get("localidade") or []) if item not in (None, "")],
         }
 
     def validate(self, attrs):

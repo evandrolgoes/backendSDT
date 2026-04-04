@@ -29,19 +29,6 @@ def _normalize_text(value):
     return str(value or "").strip().lower()
 
 
-def _normalize_locality(value):
-    if value is None:
-        return ""
-    if isinstance(value, dict):
-        parts = [value.get("uf") or value.get("sigla") or "", value.get("cidade") or value.get("nome") or ""]
-    elif isinstance(value, (list, tuple)):
-        parts = list(value)
-    else:
-        parts = str(value).split("/")
-    normalized_parts = [_normalize_text(part) for part in parts if str(part or "").strip()]
-    return "|".join(sorted(normalized_parts))
-
-
 def _parse_multi_value_param(request, key):
     values = []
     raw_items = request.query_params.getlist(key)
@@ -100,18 +87,6 @@ def _apply_common_dashboard_filters(queryset, request, *, group_fields=(), subgr
     return queryset.distinct()
 
 
-def _filter_locality_rows(rows, selected_localities, getter):
-    if not selected_localities:
-        return rows
-    selected = {_normalize_locality(item) for item in selected_localities if _normalize_locality(item)}
-    filtered = []
-    for row in rows:
-        row_values = getter(row)
-        if any(_normalize_locality(value) in selected for value in row_values):
-            filtered.append(row)
-    return filtered
-
-
 def _to_number(value):
     try:
         return float(value or 0)
@@ -123,7 +98,6 @@ def _to_number(value):
 @permission_classes([IsAuthenticated])
 def commercial_risk_summary(request):
     user = request.user
-    selected_localities = _parse_multi_value_param(request, "localidade")
 
     trigger_watchlist_refresh_async(max_age_minutes=5)
 
@@ -140,7 +114,7 @@ def commercial_risk_summary(request):
         culture_fields=("cultura",),
         season_fields=("safra",),
     )
-    crop_boards = _filter_locality_rows(list(crop_boards_qs), selected_localities, lambda row: row.localidade or [])
+    crop_boards = list(crop_boards_qs)
 
     physical_sales_qs = _apply_common_dashboard_filters(
         _scope_queryset(
@@ -155,7 +129,7 @@ def commercial_risk_summary(request):
         culture_fields=("cultura",),
         season_fields=("safra",),
     )
-    physical_sales = _filter_locality_rows(list(physical_sales_qs), selected_localities, lambda row: [row.localidade])
+    physical_sales = list(physical_sales_qs)
 
     physical_payments = list(
         _apply_common_dashboard_filters(
@@ -238,7 +212,7 @@ def commercial_risk_summary(request):
         request,
         season_fields=("safra",),
     )
-    physical_quotes = _filter_locality_rows(list(physical_quotes_qs), selected_localities, lambda row: [row.localidade])
+    physical_quotes = list(physical_quotes_qs)
     physical_quotes_count = len(physical_quotes)
 
     market_news_qs = _scope_queryset(

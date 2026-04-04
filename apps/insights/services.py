@@ -16,19 +16,6 @@ def _normalize_text(value):
     return str(value or "").strip().lower()
 
 
-def _normalize_locality(value):
-    if value is None:
-        return ""
-    if isinstance(value, dict):
-        parts = [value.get("uf") or value.get("sigla") or "", value.get("cidade") or value.get("nome") or ""]
-    elif isinstance(value, (list, tuple)):
-        parts = list(value)
-    else:
-        parts = str(value).split("/")
-    normalized_parts = [_normalize_text(part) for part in parts if str(part or "").strip()]
-    return "|".join(sorted(normalized_parts))
-
-
 def _parse_multi_value_param(request, key):
     values = []
     raw_items = request.query_params.getlist(key)
@@ -99,18 +86,6 @@ def _apply_filters(queryset, request, *, group_fields=(), subgroup_fields=(), cu
         queryset = queryset.filter(predicate)
 
     return queryset.distinct()
-
-
-def _filter_locality_rows(rows, selected_localities, getter):
-    if not selected_localities:
-        return rows
-    selected = {_normalize_locality(item) for item in selected_localities if _normalize_locality(item)}
-    filtered = []
-    for row in rows:
-        row_values = getter(row)
-        if any(_normalize_locality(value) in selected for value in row_values):
-            filtered.append(row)
-    return filtered
 
 
 def _read_label(value, fallback="Sem ativo"):
@@ -905,45 +880,35 @@ def _call_openai_insights(payload, local_insights):
 
 def build_insights_payload(request):
     user = request.user
-    selected_localities = _parse_multi_value_param(request, "localidade")
-
-    crop_boards = _filter_locality_rows(
-        list(
-            _apply_filters(
-                _scope_queryset(
-                    CropBoard.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
-                    user,
-                    group_fields=("grupo",),
-                    subgroup_fields=("subgrupo",),
-                ),
-                request,
+    crop_boards = list(
+        _apply_filters(
+            _scope_queryset(
+                CropBoard.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
+                user,
                 group_fields=("grupo",),
                 subgroup_fields=("subgrupo",),
-                culture_fields=("cultura",),
-                season_fields=("safra",),
-            )
-        ),
-        selected_localities,
-        lambda row: row.localidade or [],
+            ),
+            request,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+            culture_fields=("cultura",),
+            season_fields=("safra",),
+        )
     )
-    physical_sales = _filter_locality_rows(
-        list(
-            _apply_filters(
-                _scope_queryset(
-                    PhysicalSale.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
-                    user,
-                    group_fields=("grupo",),
-                    subgroup_fields=("subgrupo",),
-                ),
-                request,
+    physical_sales = list(
+        _apply_filters(
+            _scope_queryset(
+                PhysicalSale.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
+                user,
                 group_fields=("grupo",),
                 subgroup_fields=("subgrupo",),
-                culture_fields=("cultura",),
-                season_fields=("safra",),
-            )
-        ),
-        selected_localities,
-        lambda row: [row.localidade],
+            ),
+            request,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+            culture_fields=("cultura",),
+            season_fields=("safra",),
+        )
     )
     physical_payments = list(
         _apply_filters(
