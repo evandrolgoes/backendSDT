@@ -25,11 +25,11 @@ class StrategyViewSet(TenantScopedModelViewSet):
 
 
 class StrategyTriggerViewSet(TenantScopedModelViewSet):
-    queryset = StrategyTrigger.objects.select_related("estrategia", "cultura").prefetch_related("grupos", "subgrupos").all()
+    queryset = StrategyTrigger.objects.select_related("tenant", "estrategia", "cultura").prefetch_related("grupos", "subgrupos").all()
     serializer_class = StrategyTriggerSerializer
-    tenant_field = "estrategia__tenant"
-    filterset_fields = ["estrategia", "cultura", "status_gatilho", "tipo_fis_der", "posicao"]
-    search_fields = ["contrato_bolsa", "codigo_derivativo", "produto_bolsa", "status"]
+    tenant_field = "tenant"
+    filterset_fields = ["estrategia", "cultura", "status", "status_gatilho", "tipo", "tipo_fis_der", "posicao", "bolsa"]
+    search_fields = ["contrato_derivativo", "contrato_bolsa", "codigo_derivativo", "bolsa", "produto_bolsa", "status", "obs"]
 
 
 class HedgePolicyViewSet(TenantScopedModelViewSet):

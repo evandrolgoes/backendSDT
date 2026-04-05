@@ -21,7 +21,11 @@ class Strategy(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
 
 class StrategyTrigger(models.Model):
+    tenant = models.ForeignKey("accounts.Tenant", null=True, blank=True, on_delete=models.CASCADE, related_name="strategy_triggers")
     estrategia = models.ForeignKey(Strategy, null=True, blank=True, on_delete=models.SET_NULL, related_name="gatilhos")
+    tipo = models.CharField(max_length=20, blank=True)
+    bolsa = models.CharField(max_length=120, blank=True)
+    contrato_derivativo = models.CharField(max_length=120, blank=True)
     acima_abaixo = models.CharField(max_length=20, blank=True)
     contrato_bolsa = models.CharField(max_length=120, blank=True)
     cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="gatilhos")
@@ -32,9 +36,11 @@ class StrategyTrigger(models.Model):
     posicao = models.CharField(max_length=20, blank=True)
     produto_bolsa = models.CharField(max_length=120, blank=True)
     status_gatilho = models.CharField(max_length=50, blank=True)
+    strike = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     strike_alvo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     tipo_fis_der = models.CharField(max_length=20, blank=True)
     unidade = models.CharField(max_length=20, blank=True)
+    volume_objetivo = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     volume = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     obs = models.TextField(blank=True)
     status = models.CharField(max_length=50, blank=True)
@@ -43,7 +49,43 @@ class StrategyTrigger(models.Model):
         ordering = ["-id"]
 
     def __str__(self):
-        return self.contrato_bolsa or f"Gatilho {self.id}"
+        return self.contrato_derivativo or self.contrato_bolsa or f"Gatilho {self.id}"
+
+    def save(self, *args, **kwargs):
+        if self.estrategia_id and not self.tenant_id:
+            self.tenant_id = self.estrategia.tenant_id
+
+        if self.tipo and not self.tipo_fis_der:
+            self.tipo_fis_der = self.tipo
+        elif self.tipo_fis_der and not self.tipo:
+            self.tipo = self.tipo_fis_der
+
+        if self.bolsa and not self.produto_bolsa:
+            self.produto_bolsa = self.bolsa
+        elif self.produto_bolsa and not self.bolsa:
+            self.bolsa = self.produto_bolsa
+
+        if self.contrato_derivativo and not self.contrato_bolsa:
+            self.contrato_bolsa = self.contrato_derivativo
+        elif self.contrato_bolsa and not self.contrato_derivativo:
+            self.contrato_derivativo = self.contrato_bolsa
+
+        if self.strike is not None and self.strike_alvo is None:
+            self.strike_alvo = self.strike
+        elif self.strike_alvo is not None and self.strike is None:
+            self.strike = self.strike_alvo
+
+        if self.volume_objetivo is not None and self.volume is None:
+            self.volume = self.volume_objetivo
+        elif self.volume is not None and self.volume_objetivo is None:
+            self.volume_objetivo = self.volume
+
+        if self.status and not self.status_gatilho:
+            self.status_gatilho = self.status
+        elif self.status_gatilho and not self.status:
+            self.status = self.status_gatilho
+
+        super().save(*args, **kwargs)
 
 
 class HedgePolicy(TenantAwareModel, CreatedByMixin, TimeStampedModel):

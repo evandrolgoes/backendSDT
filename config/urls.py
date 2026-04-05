@@ -44,7 +44,15 @@ from apps.mass_update.views import (
 )
 from apps.mass_update.copy_base_views import CopyBaseApplyView, CopyBasePreviewView, CopyBaseTargetsView
 from apps.market_summary.views import MarketSummaryGenerateView
-from apps.mercado.views import FundPositionSeriesView, MarketNewsPostViewSet, mercado_health, yahoo_finance_proxy
+from apps.mercado.views import (
+    FundPositionSeriesView,
+    MarketNewsPostViewSet,
+    brazil_macro_proxy,
+    fred_proxy,
+    government_bond_proxy,
+    mercado_health,
+    yahoo_finance_proxy,
+)
 from apps.payables.views import AccountsPayableViewSet
 from apps.leads.views import LeadCreateView
 from apps.insights.views import CommercialInsightsView
@@ -108,6 +116,9 @@ urlpatterns = [
     path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
     path("api/mercado/health/", mercado_health, name="mercado_health"),
     path("api/mercado/yahoo-proxy/", yahoo_finance_proxy, name="yahoo_finance_proxy"),
+    path("api/mercado/fred-proxy/", fred_proxy, name="fred_proxy"),
+    path("api/mercado/government-bond-proxy/", government_bond_proxy, name="government_bond_proxy"),
+    path("api/mercado/brazil-macro-proxy/", brazil_macro_proxy, name="brazil_macro_proxy"),
     path("api/mercado/posicao-fundos/", FundPositionSeriesView.as_view(), name="fund_position_series"),
     path("api/anotacoes/health/", anotacoes_health, name="anotacoes_health"),
     path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
