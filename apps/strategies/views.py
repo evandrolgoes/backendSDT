@@ -18,7 +18,7 @@ IBGE_CITIES_URL = "https://servicodados.ibge.gov.br/api/v1/localidades/municipio
 
 
 class StrategyViewSet(TenantScopedModelViewSet):
-    queryset = Strategy.objects.select_related("tenant", "grupo", "subgrupo", "created_by").all()
+    queryset = Strategy.objects.select_related("tenant", "grupo", "subgrupo", "created_by").prefetch_related("grupos", "subgrupos").all()
     serializer_class = StrategySerializer
     filterset_fields = ["status"]
     search_fields = ["descricao_estrategia", "obs", "status"]

@@ -9,7 +9,9 @@ class Strategy(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     data_validade = models.DateField(null=True, blank=True)
     descricao_estrategia = models.TextField(blank=True)
     grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="estrategias")
+    grupos = models.ManyToManyField("clients.EconomicGroup", blank=True, related_name="estrategias_lista")
     subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="estrategias")
+    subgrupos = models.ManyToManyField("clients.SubGroup", blank=True, related_name="estrategias_lista")
     obs = models.TextField(blank=True)
     status = models.CharField(max_length=50, blank=True)
 
