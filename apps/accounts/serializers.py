@@ -15,7 +15,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.clients.models import EconomicGroup, SubGroup
 from apps.core.privacy import get_accessible_group_queryset, get_accessible_subgroup_queryset, sanitize_dashboard_filter
 from apps.core.serializers import PrivacyScopedSerializerMixin
-from .constants import AVAILABLE_MODULE_CODES, AVAILABLE_MODULE_CHOICES
 from .models import Invitation, Tenant, User
 
 
@@ -65,7 +64,7 @@ def _validate_master_user_access(actor, master_user):
 
 class TenantSerializer(serializers.ModelSerializer):
     enabled_modules = serializers.ListField(
-        child=serializers.ChoiceField(choices=AVAILABLE_MODULE_CHOICES),
+        child=serializers.CharField(),
         required=False,
         allow_empty=True,
     )
@@ -87,23 +86,22 @@ class TenantSerializer(serializers.ModelSerializer):
 
     def validate_enabled_modules(self, value):
         if not value:
-            return list(AVAILABLE_MODULE_CODES)
-        return [module for module in AVAILABLE_MODULE_CODES if module in value]
+            return []
+        normalized = []
+        for module in value:
+            code = str(module or "").strip()
+            if code and code not in normalized:
+                normalized.append(code)
+        return normalized
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        if not attrs.get("enabled_modules"):
-            attrs["enabled_modules"] = list(AVAILABLE_MODULE_CODES)
         return attrs
 
     def create(self, validated_data):
-        if not validated_data.get("enabled_modules"):
-            validated_data["enabled_modules"] = list(AVAILABLE_MODULE_CODES)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        if "enabled_modules" in validated_data and not validated_data.get("enabled_modules"):
-            validated_data["enabled_modules"] = list(AVAILABLE_MODULE_CODES)
         return super().update(instance, validated_data)
 
 
@@ -114,7 +112,7 @@ class UserSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     accessible_groups_display = serializers.SerializerMethodField()
     accessible_subgroups_display = serializers.SerializerMethodField()
     allowed_modules = serializers.ListField(
-        child=serializers.ChoiceField(choices=AVAILABLE_MODULE_CHOICES),
+        child=serializers.CharField(),
         required=False,
         allow_empty=True,
     )

@@ -25,6 +25,7 @@ from apps.accounts.views import (
 from apps.auditing.views import AttachmentViewSet, AuditLogViewSet, attachment_content
 from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperationNameViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
+from apps.contrato.views import ContractViewSet
 from apps.derivatives.views import (
     DerivativeOperationViewSet,
     derivative_contracts,
@@ -53,9 +54,11 @@ from apps.mercado.views import (
     mercado_health,
     yahoo_finance_proxy,
 )
+from apps.other_cash_outflows.views import OtherCashOutflowViewSet
+from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
 from apps.leads.views import LeadCreateView
-from apps.insights.views import CommercialInsightsView
+from apps.insights.views import CommercialInsightsView, MissingFieldsView
 from apps.physical.views import (
     ActualCostViewSet,
     BudgetCostViewSet,
@@ -64,7 +67,7 @@ from apps.physical.views import (
     PhysicalQuoteViewSet,
     PhysicalSaleViewSet,
 )
-from apps.receivables.views import ReceiptEntryViewSet
+from apps.receivables.views import EntryClientViewSet, ReceiptEntryViewSet
 from apps.risk.views import ExposurePositionViewSet, commercial_risk_summary
 from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
 from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
@@ -93,7 +96,10 @@ router.register("actual-costs", ActualCostViewSet, basename="actual-cost")
 router.register("physical-sales", PhysicalSaleViewSet, basename="physical-sale")
 router.register("physical-payments", PhysicalPaymentViewSet, basename="physical-payment")
 router.register("cash-payments", CashPaymentViewSet, basename="cash-payment")
+router.register("other-cash-outflows", OtherCashOutflowViewSet, basename="other-cash-outflow")
+router.register("other-entries", OtherEntryViewSet, basename="other-entry")
 router.register("receipt-entries", ReceiptEntryViewSet, basename="receipt-entry")
+router.register("receipt-clients", EntryClientViewSet, basename="receipt-client")
 router.register("derivative-operations", DerivativeOperationViewSet, basename="derivative-operation")
 router.register("strategies", StrategyViewSet, basename="strategy")
 router.register("strategy-triggers", StrategyTriggerViewSet, basename="strategy-trigger")
@@ -109,6 +115,7 @@ router.register("tradingview-watchlist-quotes", TradingViewWatchlistQuoteViewSet
 router.register("market-news-posts", MarketNewsPostViewSet, basename="market-news-post")
 router.register("anotacoes", AnotacaoViewSet, basename="anotacao")
 router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-payable")
+router.register("contracts", ContractViewSet, basename="contract")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -137,6 +144,7 @@ urlpatterns = [
     path("api/mass-import/apply/", MassImportApplyView.as_view(), name="mass_import_apply"),
     path("api/market-summary/generate/", MarketSummaryGenerateView.as_view(), name="market_summary_generate"),
     path("api/insights/commercialization/", CommercialInsightsView.as_view(), name="commercial_insights"),
+    path("api/insights/missing-fields/", MissingFieldsView.as_view(), name="missing_fields_insights"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/dashboard/commercial-risk-summary/", commercial_risk_summary, name="commercial_risk_summary"),

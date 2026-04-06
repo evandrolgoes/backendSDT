@@ -124,21 +124,34 @@ class PhysicalPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
 
 class CashPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    STATUS_PENDING = "Pendente"
+    STATUS_PAID = "Pago"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pendente"),
+        (STATUS_PAID, "Pago"),
+    ]
+
     grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
     subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
     fazer_frente_com = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
     volume = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True, verbose_name="Valor parcela")
+    valor = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True, verbose_name="Valor")
     volume_total_operacao = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True, verbose_name="Valor total da operacao")
     moeda = models.CharField(max_length=20, blank=True)
     data_desembolso = models.DateField(null=True, blank=True)
+    data_vencimento = models.DateField(null=True, blank=True)
     data_pagamento = models.DateField(null=True, blank=True)
     descricao = models.TextField(blank=True)
     obs = models.TextField(blank=True)
     contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="pgtos_caixa")
+    contraparte_texto = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
 
     class Meta:
-        ordering = ["-data_pagamento", "-created_at"]
+        ordering = ["data_pagamento", "data_vencimento", "-created_at"]
+        verbose_name = "Empréstimo"
+        verbose_name_plural = "Empréstimos"
 
     def __str__(self):
-        return self.descricao[:80] or f"Pgto caixa {self.id}"
+        return self.descricao[:80] or f"Empréstimo {self.id}"

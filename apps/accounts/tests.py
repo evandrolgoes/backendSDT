@@ -1,6 +1,7 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from apps.accounts.constants import AVAILABLE_MODULE_CODES
 from apps.accounts.models import Invitation, Tenant, User
 from apps.anotacoes.models import Anotacao
 from apps.clients.models import EconomicGroup, SubGroup
@@ -260,3 +261,31 @@ class GroupPrivacyScopeTests(TestCase):
         subgroup_response = client.get("/api/subgroups/")
         self.assertEqual(subgroup_response.status_code, 200, subgroup_response.data)
         self.assertEqual([item["id"] for item in subgroup_response.data["results"]], [self.allowed_subgroup.id])
+
+
+class ModuleAccessTests(TestCase):
+    def test_empty_enabled_modules_means_no_access(self):
+        tenant = Tenant.objects.create(name="Tenant Livre", slug="tenant-livre", enabled_modules=[])
+        user = User.objects.create_user(
+            username="tenant_full_access",
+            email="tenant_full_access@example.com",
+            password="secret123",
+            full_name="Tenant Full Access",
+            tenant=tenant,
+        )
+
+        self.assertEqual(tenant.get_enabled_modules(), [])
+        self.assertFalse(user.has_module_access("future_module_code"))
+
+    def test_tenant_with_all_known_modules_does_not_gain_future_module_access(self):
+        tenant = Tenant.objects.create(name="Tenant Legado", slug="tenant-legado", enabled_modules=list(AVAILABLE_MODULE_CODES))
+        user = User.objects.create_user(
+            username="tenant_legacy_access",
+            email="tenant_legacy_access@example.com",
+            password="secret123",
+            full_name="Tenant Legacy Access",
+            tenant=tenant,
+        )
+
+        self.assertEqual(tenant.get_enabled_modules(), list(AVAILABLE_MODULE_CODES))
+        self.assertFalse(user.has_module_access("future_module_code"))

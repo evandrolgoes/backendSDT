@@ -119,7 +119,15 @@ class TenantViewSet(TenantScopedModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="available-modules")
     def available_modules(self, request, *args, **kwargs):
-        modules = [{"id": code, "value": code, "label": label, "name": label} for code, label in AVAILABLE_MODULES]
+        labels_by_code = {code: label for code, label in AVAILABLE_MODULES}
+        configured_codes = []
+        for tenant in Tenant.objects.only("enabled_modules"):
+            for code in tenant.enabled_modules or []:
+                normalized = str(code or "").strip()
+                if normalized and normalized not in configured_codes:
+                    configured_codes.append(normalized)
+        all_codes = list(labels_by_code.keys()) + [code for code in configured_codes if code not in labels_by_code]
+        modules = [{"id": code, "value": code, "label": labels_by_code.get(code, code), "name": labels_by_code.get(code, code)} for code in all_codes]
         return response.Response(modules, status=status.HTTP_200_OK)
 
 

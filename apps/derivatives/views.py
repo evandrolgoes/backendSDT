@@ -93,7 +93,7 @@ IMPORT_TARGETS = {
         "lookup_fields": [],
     },
     "cash_payments": {
-        "label": "Pgtos Caixa",
+        "label": "Empréstimos",
         "model": CashPayment,
         "lookup_fields": [],
     },

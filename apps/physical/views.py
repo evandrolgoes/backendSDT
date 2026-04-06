@@ -82,5 +82,5 @@ class PhysicalPaymentViewSet(TenantScopedModelViewSet):
 class CashPaymentViewSet(TenantScopedModelViewSet):
     queryset = CashPayment.objects.select_related("tenant", "grupo", "subgrupo", "fazer_frente_com", "safra", "contraparte", "created_by").all()
     serializer_class = CashPaymentSerializer
-    filterset_fields = ["fazer_frente_com", "safra", "contraparte", "moeda", "data_desembolso", "data_pagamento"]
-    search_fields = ["descricao", "obs"]
+    filterset_fields = ["grupo", "subgrupo", "contraparte", "status", "moeda", "data_vencimento", "data_pagamento"]
+    search_fields = ["descricao", "contraparte_texto", "obs", "status"]

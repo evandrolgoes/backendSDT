@@ -18,6 +18,8 @@ from apps.catalog.views import (
 from apps.clients.views import CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
 from apps.core.viewsets import TenantScopedModelViewSet
 from apps.derivatives.views import DerivativeOperationViewSet
+from apps.other_cash_outflows.views import OtherCashOutflowViewSet
+from apps.other_entries.views import OtherEntryViewSet
 from apps.physical.views import (
     ActualCostViewSet,
     BudgetCostViewSet,
@@ -52,7 +54,9 @@ RESOURCE_REGISTRY = {
     "derivative-operations": {"label": "Derivativos", "viewset": DerivativeOperationViewSet, "module": "ops_derivatives"},
     "physical-sales": {"label": "Vendas Fisico", "viewset": PhysicalSaleViewSet, "module": "ops_physical_sales"},
     "physical-payments": {"label": "Pgtos Fisico", "viewset": PhysicalPaymentViewSet, "module": "ops_physical_payments"},
-    "cash-payments": {"label": "Pgtos Caixa", "viewset": CashPaymentViewSet, "module": "ops_cash_payments"},
+    "cash-payments": {"label": "Empréstimos", "viewset": CashPaymentViewSet, "module": "ops_cash_payments"},
+    "other-cash-outflows": {"label": "Outras saídas Caixa", "viewset": OtherCashOutflowViewSet, "module": "ops_other_cash_outflows"},
+    "other-entries": {"label": "Outras Entradas Caixa", "viewset": OtherEntryViewSet, "module": "ops_other_entries"},
     "strategies": {"label": "Estrategias", "viewset": StrategyViewSet, "module": "ops_strategies"},
     "strategy-triggers": {"label": "Gatilhos", "viewset": StrategyTriggerViewSet, "module": "ops_triggers"},
     "hedge-policies": {"label": "Politica de Hedge", "viewset": HedgePolicyViewSet, "module": "ops_hedge_policies"},

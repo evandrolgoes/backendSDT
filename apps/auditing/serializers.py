@@ -8,6 +8,7 @@ from .models import Attachment, AuditLog
 class AuditLogSerializer(serializers.ModelSerializer):
     usuario = serializers.SerializerMethodField()
     created_at_display = serializers.SerializerMethodField()
+    alteracoes = serializers.SerializerMethodField()
 
     def get_usuario(self, obj):
         if not obj.user:
@@ -20,10 +21,15 @@ class AuditLogSerializer(serializers.ModelSerializer):
         localized = timezone.localtime(obj.created_at)
         return localized.strftime("%d/%m/%Y %H:%M")
 
+    def get_alteracoes(self, obj):
+        changes_json = obj.changes_json if isinstance(obj.changes_json, dict) else {}
+        changes = changes_json.get("changes")
+        return changes if isinstance(changes, list) else []
+
     class Meta:
         model = AuditLog
         fields = "__all__"
-        read_only_fields = ["created_at", "created_at_display", "usuario"]
+        read_only_fields = ["created_at", "created_at_display", "usuario", "alteracoes"]
 
 
 class AttachmentSerializer(serializers.ModelSerializer):

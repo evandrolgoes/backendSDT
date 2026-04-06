@@ -24,7 +24,9 @@ AVAILABLE_MODULES = [
     ("ops_budget_costs", "Operacoes: Custo Orcamento"),
     ("ops_actual_costs", "Operacoes: Custo Realizado"),
     ("ops_physical_payments", "Operacoes: Pgtos Fisico"),
-    ("ops_cash_payments", "Operacoes: Pgtos Caixa"),
+    ("ops_cash_payments", "Operacoes: Emprestimos"),
+    ("ops_other_cash_outflows", "Operacoes: Outras saidas Caixa"),
+    ("ops_other_entries", "Operacoes: Outras Entradas Caixa"),
     ("ops_derivatives", "Operacoes: Derivativos"),
     ("ops_strategies", "Operacoes: Estrategias"),
     ("ops_triggers", "Operacoes: Gatilhos"),
@@ -43,10 +45,12 @@ AVAILABLE_MODULES = [
     ("sys_users", "Sistema: Usuarios"),
     ("sys_admin_invites", "Sistema: Convites Admin"),
     ("sys_accounts_payable", "Sistema: Contas a Pagar"),
+    ("sys_contracts", "Sistema: Contratos"),
     ("sys_logs", "Sistema: Logs"),
     ("sys_json_import", "Sistema: Importador JSON"),
     ("sys_copy_base", "Sistema: Copy Base"),
     ("sys_mass_update", "Sistema: Alteracao em Massa"),
+    ("tool_missing_fields", "Ferramentas: Pendencias Cadastrais"),
 ]
 
 AVAILABLE_MODULE_CODES = [code for code, _label in AVAILABLE_MODULES]

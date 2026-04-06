@@ -4,6 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
+from rest_framework import serializers
 
 from apps.derivatives.models import DerivativeOperation
 from apps.mercado.models import MarketNewsPost
@@ -14,6 +15,245 @@ from apps.strategies.models import CropBoard, HedgePolicy
 
 def _normalize_text(value):
     return str(value or "").strip().lower()
+
+
+MISSING_FIELDS_EXCLUDED_RESOURCES = {
+    "attachments",
+    "audit-logs",
+    "tradingview-watchlist-quotes",
+    "market-prices",
+    "fx-rates",
+    "basis-series",
+    "exposure-positions",
+    "instruments",
+    "price-sources",
+    "clients",
+    "brokers",
+}
+
+MISSING_FIELDS_EXCLUDED_FIELDS = {
+    "id",
+    "tenant",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "attachments",
+    "password",
+    "last_login",
+    "groups",
+    "user_permissions",
+}
+
+
+def _build_viewset_instance(viewset_class, request):
+    viewset = viewset_class()
+    viewset.request = request
+    viewset.action = "list"
+    viewset.format_kwarg = None
+    viewset.kwargs = {}
+    return viewset
+
+
+def _get_missing_fields_resource_registry():
+    from config.urls import router
+
+    registry = []
+    for prefix, viewset_class, basename in getattr(router, "registry", []):
+        serializer_class = getattr(viewset_class, "serializer_class", None)
+        model = getattr(getattr(serializer_class, "Meta", None), "model", None)
+        if serializer_class is None or model is None:
+            continue
+        if prefix in MISSING_FIELDS_EXCLUDED_RESOURCES:
+            continue
+        registry.append(
+            {
+                "resource": prefix,
+                "basename": basename,
+                "viewset": viewset_class,
+                "serializer_class": serializer_class,
+                "model": model,
+                "label": getattr(model._meta, "verbose_name_plural", None)
+                or getattr(model._meta, "verbose_name", None)
+                or prefix.replace("-", " "),
+            }
+        )
+    return registry
+
+
+def _get_missing_fields_serializer(serializer_class, request, *args, **kwargs):
+    kwargs.setdefault("context", {"request": request})
+    return serializer_class(*args, **kwargs)
+
+
+def _get_serializer_empty_value(instance, serializer_field):
+    try:
+        return serializer_field.get_attribute(instance)
+    except Exception:
+        return None
+
+
+def _is_effectively_empty(value, serializer_field):
+    if isinstance(serializer_field, serializers.BooleanField):
+        return value is None
+
+    if value is None:
+        return True
+
+    if isinstance(serializer_field, (serializers.ManyRelatedField, serializers.ListField)):
+        try:
+            return len(value) == 0
+        except Exception:
+            return True
+
+    if isinstance(value, str):
+        return not value.strip()
+
+    if hasattr(value, "exists"):
+        try:
+            return not value.exists()
+        except Exception:
+            return True
+
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value) == 0
+
+    return False
+
+
+def _pick_relation_label(value, fallback):
+    if value is None or value == "":
+        return fallback
+    if isinstance(value, str):
+        return value
+    for attr_name in ("grupo", "subgrupo", "ativo", "safra", "contraparte", "nome", "title", "name", "username", "email"):
+        candidate = getattr(value, attr_name, None)
+        if candidate:
+            return str(candidate)
+    return str(value)
+
+
+def _summarize_relation_values(instance, singular_name, plural_name, empty_label):
+    if hasattr(instance, singular_name):
+        value = getattr(instance, singular_name, None)
+        if value is not None:
+            return _pick_relation_label(value, empty_label)
+
+    if hasattr(instance, plural_name):
+        manager = getattr(instance, plural_name, None)
+        if manager is not None and hasattr(manager, "all"):
+            labels = [_pick_relation_label(item, empty_label) for item in manager.all()[:3]]
+            labels = [item for item in labels if item and item != empty_label]
+            if labels:
+                return ", ".join(labels)
+
+    return empty_label
+
+
+def _serialize_record_label(instance):
+    for attr_name in (
+        "titulo",
+        "nome_da_operacao",
+        "descricao",
+        "contraparte",
+        "grupo",
+        "subgrupo",
+        "ativo",
+        "safra",
+        "nome",
+        "name",
+        "title",
+        "cod_operacao_mae",
+    ):
+        value = getattr(instance, attr_name, None)
+        if value:
+            return _pick_relation_label(value, "")
+    return f"ID {instance.pk}"
+
+
+def _get_missing_fields_metadata(serializer):
+    items = []
+    for field_name, serializer_field in serializer.fields.items():
+        if isinstance(serializer_field, serializers.HiddenField):
+            continue
+        if serializer_field.read_only or serializer_field.write_only:
+            continue
+        if field_name in MISSING_FIELDS_EXCLUDED_FIELDS:
+            continue
+        items.append(
+            {
+                "name": field_name,
+                "label": serializer_field.label or field_name.replace("_", " ").title(),
+                "field": serializer_field,
+            }
+        )
+    return items
+
+
+def build_missing_fields_payload(request):
+    resources = _get_missing_fields_resource_registry()
+    rows = []
+    scanned_resources = []
+
+    for resource_config in resources:
+        viewset = _build_viewset_instance(resource_config["viewset"], request)
+        serializer = _get_missing_fields_serializer(resource_config["serializer_class"], request)
+        field_metadata = _get_missing_fields_metadata(serializer)
+        if not field_metadata:
+            continue
+
+        try:
+            queryset = viewset.get_queryset()
+        except Exception:
+            continue
+
+        scanned_resources.append(
+            {
+                "resource": resource_config["resource"],
+                "label": str(resource_config["label"]).strip().title(),
+            }
+        )
+
+        for instance in queryset:
+            missing_labels = []
+            for field_meta in field_metadata:
+                raw_value = _get_serializer_empty_value(instance, field_meta["field"])
+                if _is_effectively_empty(raw_value, field_meta["field"]):
+                    missing_labels.append(field_meta["label"])
+
+            if not missing_labels:
+                continue
+
+            rows.append(
+                {
+                    "resource": resource_config["resource"],
+                    "resource_label": str(resource_config["label"]).strip().title(),
+                    "record_id": instance.pk,
+                    "record_label": _serialize_record_label(instance),
+                    "grupo_label": _summarize_relation_values(instance, "grupo", "grupos", "Sem grupo"),
+                    "subgrupo_label": _summarize_relation_values(instance, "subgrupo", "subgrupos", "Sem subgrupo"),
+                    "missing_fields": missing_labels,
+                    "missing_count": len(missing_labels),
+                }
+            )
+
+    rows.sort(
+        key=lambda item: (
+            item["resource_label"],
+            item["grupo_label"],
+            item["subgrupo_label"],
+            item["record_id"],
+        )
+    )
+
+    return {
+        "summary": {
+            "rows": len(rows),
+            "resources": len(scanned_resources),
+            "records_with_missing_fields": len(rows),
+        },
+        "resources": scanned_resources,
+        "rows": rows,
+    }
 
 
 def _parse_multi_value_param(request, key):
@@ -1083,8 +1323,9 @@ def build_insights_payload(request):
         if row.data_pagamento and row.data_pagamento >= today:
             upcoming_maturities.append({"type": "Pgto Fisico", "title": row.descricao or _read_label(row.fazer_frente_com), "date": row.data_pagamento.isoformat()})
     for row in cash_payments:
-        if row.data_pagamento and row.data_pagamento >= today:
-            upcoming_maturities.append({"type": "Pgto Caixa", "title": row.descricao or _read_label(row.fazer_frente_com), "date": row.data_pagamento.isoformat()})
+        cashflow_date = row.data_pagamento or row.data_vencimento
+        if cashflow_date and cashflow_date >= today:
+            upcoming_maturities.append({"type": "Pgto Caixa", "title": row.descricao or row.contraparte_texto or _read_label(row.fazer_frente_com), "date": cashflow_date.isoformat()})
     for row in derivatives:
         if row.data_liquidacao and row.data_liquidacao >= today:
             upcoming_maturities.append({"type": "Derivativo", "title": row.nome_da_operacao or row.cod_operacao_mae or "Operacao derivativa", "date": row.data_liquidacao.isoformat()})

@@ -11,6 +11,17 @@ from .constants import AVAILABLE_MODULE_CODES, default_enabled_modules
 from .managers import UserManager
 
 
+def _normalize_module_codes(module_codes):
+    if not isinstance(module_codes, (list, tuple)):
+        return []
+    normalized = []
+    for code in module_codes:
+        value = str(code or "").strip()
+        if value and value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
 class Tenant(TimeStampedModel):
     class AccountType(models.TextChoices):
         SHARED_CLIENT = "shared_client", "Cliente compartilhado"
@@ -37,8 +48,7 @@ class Tenant(TimeStampedModel):
         ordering = ["name"]
 
     def save(self, *args, **kwargs):
-        if not self.enabled_modules:
-            self.enabled_modules = default_enabled_modules()
+        self.enabled_modules = _normalize_module_codes(self.enabled_modules)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -47,14 +57,15 @@ class Tenant(TimeStampedModel):
     def is_distributor(self):
         return self.account_type == self.AccountType.DISTRIBUTOR
 
+    def has_full_module_access(self):
+        return False
+
     def get_enabled_modules(self):
-        configured = self.enabled_modules or []
-        if not configured:
-            return list(AVAILABLE_MODULE_CODES)
-        return [code for code in AVAILABLE_MODULE_CODES if code in configured]
+        configured = _normalize_module_codes(self.enabled_modules)
+        return configured
 
     def has_module(self, module_code):
-        return module_code in self.get_enabled_modules()
+        return str(module_code or "").strip() in self.get_enabled_modules()
 
 
 class User(AbstractUser):
@@ -116,10 +127,13 @@ class User(AbstractUser):
             return self.tenant.get_enabled_modules()
         return list(AVAILABLE_MODULE_CODES)
 
+    def has_full_module_access(self):
+        return bool(self.is_superuser)
+
     def has_module_access(self, module_code):
-        if self.is_superuser:
+        if self.has_full_module_access():
             return True
-        return module_code in self.get_effective_modules()
+        return str(module_code or "").strip() in self.get_effective_modules()
 
     def is_tenant_admin(self):
         if self.is_superuser:

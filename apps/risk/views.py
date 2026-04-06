@@ -240,7 +240,7 @@ def commercial_risk_summary(request):
         {"label": "Política de Hedge", "path": "/politica-hedge", "count": hedge_policies_count, "hint": "Faixas e disciplina de risco"},
         {"label": "Custo Orçamento", "path": "/custo-orcamento", "count": budget_costs_count, "hint": "Base de margem e cobertura"},
         {"label": "Pgtos Físico", "path": "/pgtos-fisico", "count": len(physical_payments), "hint": "Fluxo operacional do físico"},
-        {"label": "Pgtos Caixa", "path": "/pgtos-caixa", "count": len(cash_payments), "hint": "Fluxo financeiro consolidado"},
+        {"label": "Empréstimos", "path": "/pgtos-caixa", "count": len(cash_payments), "hint": "Saídas financeiras do caixa"},
     ]
     form_completion_rows = [{**item, "status": "Preenchido" if item["count"] > 0 else "Pendente"} for item in forms]
     filled_forms = sum(1 for item in form_completion_rows if item["count"] > 0)
@@ -312,19 +312,20 @@ def commercial_risk_summary(request):
         )
 
     for item in cash_payments:
-        if not item.data_pagamento or item.data_pagamento < today_date:
+        cashflow_date = item.data_pagamento or item.data_vencimento
+        if not cashflow_date or cashflow_date < today_date:
             continue
         upcoming_rows.append(
             {
                 "recordId": item.id,
                 "resourceKey": "cash-payments",
-                "app": "Pgtos Caixa",
+                "app": "Empréstimos",
                 "title": item.descricao or "Pagamento caixa",
                 "summaryLabel": item.descricao or "Pagamento caixa",
-                "dateLabel": "Pagamento",
-                "dateText": item.data_pagamento.strftime("%d/%m/%Y"),
-                "dateKey": item.data_pagamento.isoformat(),
-                "valueLabel": _build_value_label(item.volume, item.moeda),
+                "dateLabel": "Pagamento" if item.data_pagamento else "Vencimento",
+                "dateText": cashflow_date.strftime("%d/%m/%Y"),
+                "dateKey": cashflow_date.isoformat(),
+                "valueLabel": _build_value_label(item.valor or item.volume, item.moeda),
             }
         )
 
