@@ -174,6 +174,45 @@ IMPORT_TARGETS = {
     },
 }
 
+
+def _get_all_import_targets():
+    from django.apps import apps as django_apps
+
+    combined = dict(IMPORT_TARGETS)
+
+    registered_models = {config["model"] for config in IMPORT_TARGETS.values()}
+
+    skip_app_prefixes = (
+        "django.",
+        "rest_framework",
+        "corsheaders",
+        "django_filters",
+        "simple_jwt",
+        "drf_spectacular",
+        "storages",
+    )
+
+    for app_config in django_apps.get_app_configs():
+        if any(app_config.name.startswith(p) for p in skip_app_prefixes):
+            continue
+
+        for model in app_config.get_models():
+            if model in registered_models:
+                continue
+
+            key = f"{app_config.label}__{model._meta.model_name}"
+            label = str(model._meta.verbose_name or model._meta.model_name).capitalize()
+            app_label = str(app_config.verbose_name or app_config.label).capitalize()
+
+            combined[key] = {
+                "label": f"{label} ({app_label})",
+                "model": model,
+                "lookup_fields": [],
+            }
+
+    return combined
+
+
 DERIVATIVE_BULK_SELECT_CONFIG = {
     "bolsa_ref": {"type": "select", "resource": "exchanges", "label_key": "nome", "value_key": "nome"},
     "status_operacao": {
@@ -300,7 +339,7 @@ def _build_import_database_targets():
 def _build_import_destination_options():
     return [
         {"value": key, "label": config["label"], "enabled": True}
-        for key, config in IMPORT_TARGETS.items()
+        for key, config in _get_all_import_targets().items()
     ]
 
 
@@ -319,7 +358,7 @@ def _is_importable_field(field):
 
 
 def _build_target_field_options(destination):
-    config = IMPORT_TARGETS.get(destination)
+    config = _get_all_import_targets().get(destination)
     if not config:
         return [{"value": "ignore", "label": "Ignorar"}]
 
@@ -355,7 +394,7 @@ def _get_derivative_bulk_fields():
                     "resource": next(
                         (
                             key
-                            for key, config in IMPORT_TARGETS.items()
+                            for key, config in _get_all_import_targets().items()
                             if config.get("model") is related_model
                         ),
                         None,
@@ -459,7 +498,7 @@ def _suggest_target_field_for_destination(source_name, destination):
         if suggestion != "ignore":
             return suggestion
 
-    config = IMPORT_TARGETS.get(destination)
+    config = _get_all_import_targets().get(destination)
     if not config:
         return "ignore"
 
@@ -982,7 +1021,7 @@ def derivative_contracts(request):
 def inspect_bubble_import(request):
     raw_json = request.data.get("rawJson")
     destination = _normalize_import_key(request.data.get("destination")) or "derivatives"
-    if destination not in IMPORT_TARGETS:
+    if destination not in _get_all_import_targets():
         return Response({"detail": "Tabela de destino invalida."}, status=status.HTTP_400_BAD_REQUEST)
     if not str(raw_json or "").strip():
         return Response({"detail": "Cole o JSON bruto para continuar."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1012,7 +1051,7 @@ def import_bubble_derivatives(request):
     database_target = _normalize_import_key(request.data.get("databaseTarget"))
     destination = _normalize_import_key(request.data.get("destination"))
     raw_json = request.data.get("rawJson")
-    target_config = IMPORT_TARGETS.get(destination)
+    target_config = _get_all_import_targets().get(destination)
     mapping = request.data.get("mapping") or {}
 
     if database_target not in {"", "current"}:
