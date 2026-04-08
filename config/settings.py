@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "apps.risk",
     "apps.auditing",
     "apps.leads",
+    "apps.agenda",
     "apps.tradingview_scraper",
     "apps.mass_update",
     "apps.insights",
@@ -234,6 +235,8 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOWED_ORIGIN_REGEXES.extend(config("CORS_ALLOWED_ORIGIN_REGEXES_EXTRA", cast=Csv(), default=""))
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5174")
+GOOGLE_CALENDAR_REDIRECT_URI = config("GOOGLE_CALENDAR_REDIRECT_URI", default="")
+GOOGLE_CALENDAR_FRONTEND_URL = config("GOOGLE_CALENDAR_FRONTEND_URL", default=FRONTEND_URL)
 ACCESS_REQUEST_NOTIFY_EMAIL = config("ACCESS_REQUEST_NOTIFY_EMAIL", default="evandrogoes@agrosaldaterra.com.br")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@sdt.local")
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")

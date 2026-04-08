@@ -57,6 +57,7 @@ from apps.mercado.views import (
 from apps.other_cash_outflows.views import OtherCashOutflowViewSet
 from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
+from apps.agenda.views import GoogleCalendarConfigViewSet
 from apps.leads.views import LeadCreateView
 from apps.insights.views import CommercialInsightsView, MissingFieldsView
 from apps.physical.views import (
@@ -114,6 +115,7 @@ router.register("attachments", AttachmentViewSet, basename="attachment")
 router.register("tradingview-watchlist-quotes", TradingViewWatchlistQuoteViewSet, basename="tradingview-watchlist-quote")
 router.register("market-news-posts", MarketNewsPostViewSet, basename="market-news-post")
 router.register("anotacoes", AnotacaoViewSet, basename="anotacao")
+router.register("agenda-configs", GoogleCalendarConfigViewSet, basename="agenda-config")
 router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-payable")
 router.register("contracts", ContractViewSet, basename="contract")
 
@@ -158,6 +160,7 @@ urlpatterns = [
     path("api/auth/request-access/", AccessRequestView.as_view(), name="request_access"),
     path("api/auth/invitations/<str:token>/", InvitationDetailByTokenView.as_view(), name="invitation_detail_by_token"),
     path("api/auth/invitations/<str:token>/accept/", InvitationAcceptView.as_view(), name="invitation_accept"),
+    path("api/agenda/", include("apps.agenda.urls")),
     path("api/leads/", LeadCreateView.as_view(), name="lead_create"),
     path("api/attachments/content/<int:attachment_id>/", attachment_content, name="attachment_content"),
     re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
