@@ -1,15 +1,21 @@
+from datetime import datetime, timedelta
+
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core import signing
 from django.shortcuts import redirect
+from rest_framework import parsers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
+from apps.auditing.models import Attachment
+from apps.auditing.serializers import AttachmentSerializer
 from apps.core.viewsets import TenantScopedModelViewSet
 
-from .models import GoogleCalendarConfig
-from .serializers import GoogleCalendarConfigSerializer
+from .models import ClientAgendaEvent, GoogleCalendarConfig
+from .serializers import ClientAgendaEventSerializer, GoogleCalendarConfigSerializer
 
 GOOGLE_CALENDAR_SCOPES = [
     "https://www.googleapis.com/auth/calendar",
@@ -17,6 +23,81 @@ GOOGLE_CALENDAR_SCOPES = [
 
 _SIGNING_SALT = "agenda_oauth_state"
 _STATE_MAX_AGE = 600  # 10 minutos
+
+
+def _build_recurrence_rule(repeticao, repetir_ate):
+    repeat_mode = str(repeticao or "").strip().lower()
+    until_value = str(repetir_ate or "").strip()
+    if repeat_mode not in {"weekly", "monthly"} or not until_value:
+        return None
+
+    try:
+        until_date = datetime.strptime(until_value, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+    freq = "WEEKLY" if repeat_mode == "weekly" else "MONTHLY"
+    until_formatted = until_date.strftime("%Y%m%dT235959Z")
+    return f"RRULE:FREQ={freq};UNTIL={until_formatted}"
+
+
+def _shift_month(date_value):
+    month = date_value.month - 1 + 1
+    year = date_value.year + month // 12
+    month = month % 12 + 1
+    from calendar import monthrange
+    day = min(date_value.day, monthrange(year, month)[1])
+    return date_value.replace(year=year, month=month, day=day)
+
+
+def _iter_client_event_occurrences(event, range_start, range_end):
+    occurrence_date = event.data_inicio
+    limit_date = event.repetir_ate or event.data_fim or event.data_inicio
+    duration_days = max((event.data_fim - event.data_inicio).days, 0)
+
+    while occurrence_date <= range_end and occurrence_date <= limit_date:
+        occurrence_end = occurrence_date + timedelta(days=duration_days)
+        if occurrence_date <= range_end and occurrence_end >= range_start:
+            yield occurrence_date, occurrence_end
+
+        if event.repeticao == ClientAgendaEvent.RepeatChoices.WEEKLY:
+            occurrence_date = occurrence_date + timedelta(days=7)
+        elif event.repeticao == ClientAgendaEvent.RepeatChoices.MONTHLY:
+            occurrence_date = _shift_month(occurrence_date)
+        else:
+            break
+
+
+def _serialize_client_event(event, occurrence_start, occurrence_end):
+    if event.dia_todo:
+        start_payload = {"date": occurrence_start.isoformat()}
+        end_payload = {"date": occurrence_end.isoformat()}
+    else:
+        start_dt = datetime.combine(occurrence_start, event.hora_inicio or datetime.min.time())
+        end_dt = datetime.combine(occurrence_end, event.hora_fim or event.hora_inicio or datetime.min.time())
+        start_payload = {"dateTime": start_dt.isoformat(), "timeZone": "America/Sao_Paulo"}
+        end_payload = {"dateTime": end_dt.isoformat(), "timeZone": "America/Sao_Paulo"}
+
+    recurrence = []
+    recurrence_rule = _build_recurrence_rule(event.repeticao, event.repetir_ate.isoformat() if event.repetir_ate else "")
+    if recurrence_rule:
+        recurrence = [recurrence_rule]
+
+    return {
+        "id": str(event.id),
+        "recurringEventId": str(event.id) if recurrence else "",
+        "summary": event.titulo,
+        "description": event.descricao,
+        "location": event.local,
+        "participantes": event.participantes,
+        "start": start_payload,
+        "end": end_payload,
+        "recurrence": recurrence,
+        "grupo_ids": list(event.grupos.order_by("grupo", "id").values_list("id", flat=True)),
+        "subgrupo_ids": list(event.subgrupos.order_by("subgrupo", "id").values_list("id", flat=True)),
+        "grupos_display": list(event.grupos.order_by("grupo", "id").values_list("grupo", flat=True)),
+        "subgrupos_display": list(event.subgrupos.order_by("subgrupo", "id").values_list("subgrupo", flat=True)),
+    }
 
 
 def _get_redirect_uri(request):
@@ -272,11 +353,14 @@ class AgendaEventosView(APIView):
         com_meet = bool(request.data.get("com_meet", False))
         convidados = request.data.get("convidados") or []
         enviar_convites = bool(request.data.get("enviar_convites", False))
-
+        repeticao = str(request.data.get("repeticao") or "").strip().lower()
+        repetir_ate = str(request.data.get("repetir_ate") or "").strip()
         if not titulo:
             return Response({"detail": "Titulo e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
         if not data_inicio:
             return Response({"detail": "Data de inicio e obrigatoria."}, status=status.HTTP_400_BAD_REQUEST)
+        if repeticao in {"weekly", "monthly"} and not repetir_ate:
+            return Response({"detail": "Informe a data final da repeticao."}, status=status.HTTP_400_BAD_REQUEST)
 
         if dia_todo:
             event_body = {
@@ -312,6 +396,10 @@ class AgendaEventosView(APIView):
         if isinstance(convidados, list) and convidados:
             event_body["attendees"] = [{"email": e.strip()} for e in convidados if str(e).strip()]
 
+        recurrence_rule = _build_recurrence_rule(repeticao, repetir_ate)
+        if recurrence_rule:
+            event_body["recurrence"] = [recurrence_rule]
+
         try:
             service = _get_calendar_service(config)
             send_updates = "all" if enviar_convites else "none"
@@ -337,3 +425,97 @@ class AgendaEventosView(APIView):
 
         code = status.HTTP_200_OK if event_id else status.HTTP_201_CREATED
         return Response({"evento": evento}, status=code)
+
+
+class ClientAgendaEventosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        data_inicio = str(request.query_params.get("data_inicio") or "").strip()
+        data_fim = str(request.query_params.get("data_fim") or "").strip()
+        if not data_inicio or not data_fim:
+            return Response({"detail": "data_inicio e data_fim sao obrigatorios."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            range_start = datetime.strptime(data_inicio[:10], "%Y-%m-%d").date()
+            range_end = datetime.strptime(data_fim[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"detail": "Formato de data invalido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = (
+            ClientAgendaEvent.objects.filter(tenant=request.user.tenant)
+            .prefetch_related("grupos", "subgrupos")
+            .order_by("data_inicio", "hora_inicio", "id")
+        )
+
+        eventos = []
+        for item in queryset:
+            for occurrence_start, occurrence_end in _iter_client_event_occurrences(item, range_start, range_end):
+                eventos.append(_serialize_client_event(item, occurrence_start, occurrence_end))
+        eventos.sort(key=lambda entry: entry["start"].get("dateTime") or entry["start"].get("date") or "")
+        return Response({"eventos": eventos})
+
+    def post(self, request):
+        serializer = ClientAgendaEventSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        event = serializer.save(tenant=request.user.tenant, created_by=request.user)
+        return Response({"evento": _serialize_client_event(event, event.data_inicio, event.data_fim)}, status=status.HTTP_201_CREATED)
+
+    def put(self, request):
+        event_id = request.data.get("event_id")
+        if not event_id:
+            return Response({"detail": "event_id e obrigatorio para edicao."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            instance = ClientAgendaEvent.objects.get(pk=event_id, tenant=request.user.tenant)
+        except ClientAgendaEvent.DoesNotExist:
+            return Response({"detail": "Evento nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ClientAgendaEventSerializer(instance, data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        event = serializer.save()
+        return Response({"evento": _serialize_client_event(event, event.data_inicio, event.data_fim)}, status=status.HTTP_200_OK)
+
+
+class ClientAgendaEventAttachmentsView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    def get_event(self, pk, user):
+        return ClientAgendaEvent.objects.get(pk=pk, tenant=user.tenant)
+
+    def get(self, request, pk):
+        try:
+            event = self.get_event(pk, request.user)
+        except ClientAgendaEvent.DoesNotExist:
+            return Response({"detail": "Evento nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        content_type = ContentType.objects.get_for_model(ClientAgendaEvent)
+        queryset = Attachment.objects.filter(
+            tenant=event.tenant,
+            content_type=content_type,
+            object_id=event.pk,
+        ).order_by("-created_at")
+        return Response(AttachmentSerializer(queryset, many=True, context={"request": request}).data)
+
+    def post(self, request, pk):
+        try:
+            event = self.get_event(pk, request.user)
+        except ClientAgendaEvent.DoesNotExist:
+            return Response({"detail": "Evento nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        files = request.FILES.getlist("files")
+        if not files:
+            return Response({"detail": "Nenhum arquivo enviado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        content_type = ContentType.objects.get_for_model(ClientAgendaEvent)
+        created = [
+            Attachment.create_from_upload(
+                tenant=event.tenant,
+                uploaded_by=request.user,
+                content_type=content_type,
+                object_id=event.pk,
+                uploaded_file=uploaded_file,
+            )
+            for uploaded_file in files
+        ]
+        return Response(AttachmentSerializer(created, many=True, context={"request": request}).data, status=status.HTTP_201_CREATED)
