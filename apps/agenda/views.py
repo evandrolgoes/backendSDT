@@ -433,20 +433,28 @@ class ClientAgendaEventosView(APIView):
     def get(self, request):
         data_inicio = str(request.query_params.get("data_inicio") or "").strip()
         data_fim = str(request.query_params.get("data_fim") or "").strip()
-        if not data_inicio or not data_fim:
-            return Response({"detail": "data_inicio e data_fim sao obrigatorios."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            range_start = datetime.strptime(data_inicio[:10], "%Y-%m-%d").date()
-            range_end = datetime.strptime(data_fim[:10], "%Y-%m-%d").date()
-        except ValueError:
-            return Response({"detail": "Formato de data invalido."}, status=status.HTTP_400_BAD_REQUEST)
 
         queryset = (
             ClientAgendaEvent.objects.filter(tenant=request.user.tenant)
             .prefetch_related("grupos", "subgrupos")
             .order_by("data_inicio", "hora_inicio", "id")
         )
+
+        if data_inicio or data_fim:
+            if not data_inicio or not data_fim:
+                return Response({"detail": "Informe data_inicio e data_fim juntos, ou omita ambos."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                range_start = datetime.strptime(data_inicio[:10], "%Y-%m-%d").date()
+                range_end = datetime.strptime(data_fim[:10], "%Y-%m-%d").date()
+            except ValueError:
+                return Response({"detail": "Formato de data invalido."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            items = list(queryset)
+            if not items:
+                return Response({"eventos": []})
+            range_start = min(item.data_inicio for item in items)
+            range_end = max((item.repetir_ate or item.data_fim or item.data_inicio) for item in items)
+            queryset = items
 
         eventos = []
         for item in queryset:
