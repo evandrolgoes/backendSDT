@@ -90,6 +90,8 @@ def _serialize_client_event(event, occurrence_start, occurrence_end):
         "description": event.descricao,
         "location": event.local,
         "participantes": event.participantes,
+        "created_at": event.created_at.isoformat() if event.created_at else "",
+        "updated_at": event.updated_at.isoformat() if event.updated_at else "",
         "start": start_payload,
         "end": end_payload,
         "recurrence": recurrence,
