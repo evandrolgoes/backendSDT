@@ -117,6 +117,8 @@ class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
     subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="quadros_safra")
+    data_plantio = models.DateField(null=True, blank=True)
+    data_colheita = models.DateField(null=True, blank=True)
     localidade = models.JSONField(default=list, blank=True)
     area = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     bolsa_ref = models.CharField(max_length=50, blank=True)

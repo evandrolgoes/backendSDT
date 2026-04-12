@@ -190,6 +190,56 @@ def _to_number(value):
         return 0.0
 
 
+def _format_exchange_summary_label(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    normalized = raw.replace("_", " ").replace("-", " ").replace("/", " ")
+    return " ".join(part.capitalize() for part in normalized.split())
+
+
+def _capitalize_first_summary_label(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return raw[:1].upper() + raw[1:]
+
+
+def _format_operation_summary_part(value):
+    raw = str(value or "").replace("_", " ").replace("-", " ").strip()
+    if not raw:
+        return ""
+
+    special_tokens = {
+        "ndf": "NDF",
+        "usd": "USD",
+        "brl": "BRL",
+    }
+    return " ".join(
+        special_tokens.get(part.lower(), part[:1].upper() + part[1:].lower())
+        for part in raw.split()
+    )
+
+
+def _build_derivative_position_type_summary_label(item):
+    parts = [
+        _format_operation_summary_part(getattr(item, "posicao", "")),
+        _format_operation_summary_part(getattr(item, "tipo_derivativo", "")),
+    ]
+    operation_label = " ".join(part for part in parts if part).strip()
+    return operation_label or _capitalize_first_summary_label(
+        item.nome_da_operacao or item.contrato_derivativo or item.cod_operacao_mae or "Operacao derivativa"
+    )
+
+
+def _format_strike_montagem_summary_label(value, unit):
+    if value is None or value == "":
+        return ""
+    formatted = f"{_to_number(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    unit_label = str(unit or "").strip()
+    return f"{formatted} {unit_label}".strip()
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def commercial_risk_summary(request):
@@ -515,7 +565,15 @@ def commercial_risk_summary(request):
     for item in upcoming_derivatives:
         if not item.data_liquidacao or item.data_liquidacao < today_date or item.data_liquidacao > cutoff_date:
             continue
-        operation_label = item.nome_da_operacao or item.contrato_derivativo or item.cod_operacao_mae or "Operacao derivativa"
+        operation_label = _build_derivative_position_type_summary_label(item)
+        exchange_label = _format_exchange_summary_label(item.bolsa_ref)
+        strike_label = _format_strike_montagem_summary_label(item.strike_montagem, item.strike_moeda_unidade)
+        operation_with_strike = f"{operation_label} {strike_label}".strip()
+        derivative_summary_label = (
+            f"{exchange_label} - {operation_with_strike}"
+            if exchange_label
+            else operation_with_strike
+        )
         # Ajuste MTM: mesma lógica do frontend — cotação ao vivo via TradingView para operações em aberto
         ajuste_raw, ajuste_moeda = _calculate_derivative_mtm(item, live_quotes_by_ticker, live_usd_brl_rate)
         ajuste_label = _build_value_label(ajuste_raw, ajuste_moeda, signed=True) if ajuste_moeda else "— 0,00"
@@ -525,7 +583,9 @@ def commercial_risk_summary(request):
                 "resourceKey": "derivative-operations",
                 "app": "Derivativos",
                 "title": operation_label,
-                "summaryLabel": operation_label,
+                "summaryLabel": derivative_summary_label,
+                "exchangeLabel": exchange_label,
+                "strikeMontagemLabel": strike_label,
                 "dateLabel": "Liquidacao",
                 "dateText": item.data_liquidacao.strftime("%d/%m/%Y"),
                 "dateKey": item.data_liquidacao.isoformat(),
