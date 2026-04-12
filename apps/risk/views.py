@@ -488,8 +488,8 @@ def commercial_risk_summary(request):
                 "dateLabel": "Pagamento",
                 "dateText": item.data_pagamento.strftime("%d/%m/%Y"),
                 "dateKey": item.data_pagamento.isoformat(),
-                "valueLabel": _build_value_label(item.volume, item.unidade),
-                "valueColor": "neutral",
+                "valueLabel": _build_value_label(-abs(_to_number(item.volume)), item.unidade, signed=True),
+                "valueColor": "negative",
             }
         )
 
@@ -507,7 +507,7 @@ def commercial_risk_summary(request):
                 "dateLabel": "Pagamento" if item.data_pagamento else "Vencimento",
                 "dateText": cashflow_date.strftime("%d/%m/%Y"),
                 "dateKey": cashflow_date.isoformat(),
-                "valueLabel": _build_value_label(item.valor or item.volume, item.moeda),
+                "valueLabel": _build_value_label(-abs(_to_number(item.valor or item.volume)), item.moeda, signed=True),
                 "valueColor": "negative",
             }
         )
