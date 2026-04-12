@@ -156,9 +156,9 @@ def _get_base_queryset(viewset_class, request):
 
 
 def _get_serializer(viewset_class, request, *args, **kwargs):
-    serializer_class = viewset_class.serializer_class
+    viewset = _build_viewset(viewset_class, request)
     kwargs.setdefault("context", {"request": request})
-    return serializer_class(*args, **kwargs)
+    return viewset.get_serializer(*args, **kwargs)
 
 
 def _normalize_filter_value(raw_value):

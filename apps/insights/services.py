@@ -11,6 +11,7 @@ from apps.mercado.models import MarketNewsPost
 from apps.physical.models import BudgetCost, CashPayment, PhysicalPayment, PhysicalSale
 from apps.core.privacy import apply_group_privacy_scope
 from apps.strategies.models import CropBoard, HedgePolicy
+from .models import MissingFieldIgnoredConfig
 
 
 def _normalize_text(value):
@@ -189,15 +190,115 @@ def _get_missing_fields_metadata(serializer):
     return items
 
 
+def _get_missing_fields_scope_queryset(request):
+    tenant_id = getattr(getattr(request, "user", None), "tenant_id", None)
+    queryset = MissingFieldIgnoredConfig.objects.all()
+    if tenant_id is None:
+        return queryset.filter(tenant__isnull=True)
+    return queryset.filter(tenant_id=tenant_id)
+
+
+def get_missing_fields_ignored_lookup(request):
+    ignored_lookup = defaultdict(set)
+    for item in _get_missing_fields_scope_queryset(request).values("resource", "field_name"):
+        ignored_lookup[str(item["resource"]).strip()].add(str(item["field_name"]).strip())
+    return ignored_lookup
+
+
+def get_missing_fields_config_payload(request):
+    resources = []
+    ignored_items = []
+    ignored_by_key = {
+        (str(item.resource).strip(), str(item.field_name).strip()): item
+        for item in _get_missing_fields_scope_queryset(request).order_by("resource_label", "field_label", "id")
+    }
+
+    for resource_config in _get_missing_fields_resource_registry():
+        serializer = _get_missing_fields_serializer(resource_config["serializer_class"], request)
+        field_metadata = _get_missing_fields_metadata(serializer)
+        if not field_metadata:
+            continue
+
+        normalized_resource = str(resource_config["resource"]).strip()
+        resource_label = str(resource_config["label"]).strip().title()
+        resource_fields = []
+
+        for field_meta in sorted(field_metadata, key=lambda item: str(item["label"]).strip().lower()):
+            normalized_field_name = str(field_meta["name"]).strip()
+            normalized_field_label = str(field_meta["label"]).strip()
+            ignored_item = ignored_by_key.get((normalized_resource, normalized_field_name))
+
+            resource_fields.append(
+                {
+                    "name": normalized_field_name,
+                    "label": normalized_field_label,
+                    "ignored": bool(ignored_item),
+                }
+            )
+
+            if ignored_item:
+                ignored_items.append(
+                    {
+                        "id": ignored_item.id,
+                        "resource": normalized_resource,
+                        "resource_label": resource_label,
+                        "field_name": normalized_field_name,
+                        "field_label": normalized_field_label,
+                    }
+                )
+
+        resources.append(
+            {
+                "resource": normalized_resource,
+                "label": resource_label,
+                "fields": resource_fields,
+            }
+        )
+
+    resources.sort(key=lambda item: (item["label"], item["resource"]))
+    ignored_items.sort(key=lambda item: (item["resource_label"], item["field_label"], item["id"]))
+
+    return {
+        "resources": resources,
+        "ignored_fields": ignored_items,
+    }
+
+
+def get_missing_fields_config_option(request, resource, field_name):
+    resource_map = {
+        str(item["resource"]).strip(): item
+        for item in get_missing_fields_config_payload(request)["resources"]
+    }
+    resource_item = resource_map.get(str(resource or "").strip())
+    if not resource_item:
+        return None
+
+    normalized_field_name = str(field_name or "").strip()
+    for field_item in resource_item["fields"]:
+        if str(field_item["name"]).strip() == normalized_field_name:
+            return {
+                "resource": str(resource_item["resource"]).strip(),
+                "resource_label": str(resource_item["label"]).strip(),
+                "field_name": normalized_field_name,
+                "field_label": str(field_item["label"]).strip(),
+            }
+
+    return None
+
+
 def build_missing_fields_payload(request):
     resources = _get_missing_fields_resource_registry()
     rows = []
     scanned_resources = []
+    ignored_lookup = get_missing_fields_ignored_lookup(request)
 
     for resource_config in resources:
         viewset = _build_viewset_instance(resource_config["viewset"], request)
         serializer = _get_missing_fields_serializer(resource_config["serializer_class"], request)
         field_metadata = _get_missing_fields_metadata(serializer)
+        ignored_field_names = ignored_lookup.get(str(resource_config["resource"]).strip(), set())
+        if ignored_field_names:
+            field_metadata = [item for item in field_metadata if str(item["name"]).strip() not in ignored_field_names]
         if not field_metadata:
             continue
 
@@ -252,6 +353,7 @@ def build_missing_fields_payload(request):
             "records_with_missing_fields": len(rows),
         },
         "resources": scanned_resources,
+        "ignored_fields_count": sum(len(field_names) for field_names in ignored_lookup.values()),
         "rows": rows,
     }
 

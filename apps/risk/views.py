@@ -29,6 +29,102 @@ def _normalize_text(value):
     return str(value or "").strip().lower()
 
 
+def _calculate_derivative_mtm(item, quotes_by_ticker=None, usd_brl_rate=0.0):
+    """
+    Calcula o ajuste MTM de um derivativo usando as mesmas regras do frontend
+    (calculateDerivativeMtm / calculatePriceCompositionDerivativeMtm).
+
+    Prioridade do preço de mercado (strike_mercado):
+    1. Cotação ao vivo: quotes_by_ticker[item.contrato_derivativo]  ← igual ao frontend
+    2. Fallback: item.strike_liquidacao (preço registrado no cadastro)
+    3. Se nenhum: usa ajustes_totais armazenados
+
+    Retorna (valor_raw: float, moeda: str "USD" | "BRL" | None).
+    """
+    import unicodedata
+
+    def normalize_op(value):
+        # Mesmo comportamento de normalizeText() no frontend:
+        # NFD → remove diacríticos (categoria Mn) → trim → lower
+        v = str(value or "").strip()
+        v = unicodedata.normalize("NFD", v)
+        v = "".join(c for c in v if unicodedata.category(c) != "Mn")
+        return v.strip().lower()
+
+    if quotes_by_ticker is None:
+        quotes_by_ticker = {}
+
+    status = str(item.status_operacao or "").strip().lower()
+    is_usd_op = str(item.volume_financeiro_moeda or "").strip() == "U$"
+
+    # ── Operação encerrada: valores já registrados ──────────────────────────
+    if status != "em aberto":
+        if item.ajustes_totais_usd is not None:
+            return float(item.ajustes_totais_usd), "USD"
+        if item.ajustes_totais_brl is not None:
+            return float(item.ajustes_totais_brl), "BRL"
+        return 0.0, None
+
+    # ── Resolve preço de mercado: cotação ao vivo → strike_liquidacao ──────
+    ticker = str(item.contrato_derivativo or "").strip()
+    live_price = quotes_by_ticker.get(ticker)
+    if live_price is not None:
+        strike_mercado_raw = float(live_price)
+    elif item.strike_liquidacao:
+        strike_mercado_raw = float(item.strike_liquidacao)
+    else:
+        # Sem preço de mercado → usa ajustes armazenados como estimativa
+        if item.ajustes_totais_usd is not None:
+            return float(item.ajustes_totais_usd), "USD"
+        if item.ajustes_totais_brl is not None:
+            return float(item.ajustes_totais_brl), "BRL"
+        return 0.0, None
+
+    # ── Resolve nome da operação (igual a resolveDerivativeOperationName) ──
+    explicit_name = str(item.nome_da_operacao or "").strip()
+    if explicit_name:
+        operation_name = normalize_op(explicit_name)
+    else:
+        posicao = str(item.posicao or "").strip()
+        tipo = str(item.tipo_derivativo or "").strip()
+        operation_name = normalize_op(f"{posicao} {tipo}".strip())
+
+    # ── Resolve volume (igual a resolveDerivativeVolume) ───────────────────
+    mode = str(item.moeda_ou_cmdtye or "").strip().lower()
+    if mode == "moeda":
+        volume = float(item.volume_financeiro_valor or 0)
+    else:
+        volume = float(item.volume_fisico_valor or item.numero_lotes or 0)
+
+    # ── Strike factor: centavos → unidade ──────────────────────────────────
+    strike_unit = str(item.strike_moeda_unidade or "").strip().lower()
+    strike_factor = 0.01 if strike_unit.startswith("c") else 1
+
+    strike_montagem = float(item.strike_montagem or 0) * strike_factor
+    strike_mercado = strike_mercado_raw * strike_factor
+
+    # ── Fórmula por tipo de operação (idêntica ao frontend) ────────────────
+    usd = 0.0
+    if "venda ndf" in operation_name:
+        usd = (strike_montagem - strike_mercado) * volume
+    elif "compra ndf" in operation_name:
+        usd = (strike_mercado - strike_montagem) * volume
+    elif "compra call" in operation_name:
+        usd = (strike_mercado - strike_montagem) * volume if strike_mercado > strike_montagem else 0.0
+    elif "compra put" in operation_name:
+        usd = (strike_montagem - strike_mercado) * volume if strike_mercado < strike_montagem else 0.0
+    elif "venda call" in operation_name:
+        usd = (strike_montagem - strike_mercado) * volume if strike_mercado > strike_montagem else 0.0
+    elif "venda put" in operation_name:
+        usd = (strike_mercado - strike_montagem) * volume if strike_mercado < strike_montagem else 0.0
+
+    # ── Moeda de retorno ───────────────────────────────────────────────────
+    if is_usd_op:
+        return usd, "USD"
+    else:
+        return usd, "BRL"
+
+
 def _parse_multi_value_param(request, key):
     values = []
     raw_items = request.query_params.getlist(key)
@@ -179,6 +275,62 @@ def commercial_risk_summary(request):
         )
     )
 
+    upcoming_physical_sales = list(
+        _apply_common_dashboard_filters(
+            _scope_queryset(
+                PhysicalSale.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
+                user,
+                group_fields=("grupo",),
+                subgroup_fields=("subgrupo",),
+            ),
+            request,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+        )
+    )
+
+    upcoming_physical_payments = list(
+        _apply_common_dashboard_filters(
+            _scope_queryset(
+                PhysicalPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
+                user,
+                group_fields=("grupo",),
+                subgroup_fields=("subgrupo",),
+            ),
+            request,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+        )
+    )
+
+    upcoming_cash_payments = list(
+        _apply_common_dashboard_filters(
+            _scope_queryset(
+                CashPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
+                user,
+                group_fields=("grupo",),
+                subgroup_fields=("subgrupo",),
+            ),
+            request,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+        )
+    )
+
+    upcoming_derivatives = list(
+        _apply_common_dashboard_filters(
+            _scope_queryset(
+                DerivativeOperation.objects.select_related("grupo", "subgrupo", "ativo", "destino_cultura", "safra"),
+                user,
+                group_fields=("grupo",),
+                subgroup_fields=("subgrupo",),
+            ),
+            request,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+        )
+    )
+
     hedge_policies_count = _apply_common_dashboard_filters(
         _scope_queryset(
             HedgePolicy.objects.select_related("cultura", "safra"),
@@ -227,6 +379,19 @@ def commercial_risk_summary(request):
         TradingViewWatchlistQuote.objects.all().order_by("sort_order", "ticker")
     )
 
+    # Dict ticker → price usado no cálculo MTM (igual ao frontend: derivativeQuotes[row.contrato_derivativo])
+    live_quotes_by_ticker = {
+        str(q.ticker).strip(): float(q.price)
+        for q in market_quotes_rows
+        if q.ticker and q.price is not None
+    }
+    # Taxa USD/BRL ao vivo (ticker USDBRL ou USD/BRL)
+    live_usd_brl_rate = (
+        live_quotes_by_ticker.get("USDBRL")
+        or live_quotes_by_ticker.get("USD/BRL")
+        or 0.0
+    )
+
     production_total = sum(abs(_to_number(item.producao_total)) for item in crop_boards)
     total_area = sum(abs(_to_number(item.area)) for item in crop_boards)
     physical_payment_volume = sum(abs(_to_number(item.volume)) for item in physical_payments)
@@ -251,17 +416,28 @@ def commercial_risk_summary(request):
         "totalRecords": sum(item["count"] for item in form_completion_rows),
     }
 
-    def _build_value_label(value, unit_label=""):
+    def _build_value_label(value, unit_label="", signed=False):
         amount = _to_number(value)
         unit = str(unit_label or "").strip()
-        if not amount:
+        sign = ("+" if amount >= 0 else "") if signed else ""
+        if not signed and not amount:
             return unit or "—"
+        def fmt(symbol, val):
+            formatted = f"{abs(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            if signed:
+                prefix = "+" if val >= 0 else "-"
+                return f"{prefix} {symbol} {formatted}"
+            return f"{symbol} {formatted}"
         if "u$" in _normalize_text(unit) or "usd" in _normalize_text(unit):
-            return f"U$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return fmt("U$", amount)
         if "€" in _normalize_text(unit) or "eur" in _normalize_text(unit):
-            return f"€ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return fmt("€", amount)
         if "r$" in _normalize_text(unit) or "brl" in _normalize_text(unit):
-            return f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return fmt("R$", amount)
+        if signed:
+            sign = "+" if amount >= 0 else "-"
+            formatted = f"{abs(amount):,.0f}".replace(",", ".")
+            return f"{sign} {formatted}" + (f" {unit}" if unit else "")
         return f"{amount:,.0f}".replace(",", ".") + (f" {unit}" if unit else "")
 
     upcoming_rows = []
@@ -270,6 +446,8 @@ def commercial_risk_summary(request):
     from django.utils import timezone
     from datetime import datetime
 
+    from datetime import timedelta
+
     today_date = timezone.localdate()
     if today:
         try:
@@ -277,8 +455,10 @@ def commercial_risk_summary(request):
         except ValueError:
             pass
 
-    for item in physical_sales:
-        if not item.data_pagamento or item.data_pagamento < today_date:
+    cutoff_date = today_date + timedelta(days=90)
+
+    for item in upcoming_physical_sales:
+        if not item.data_pagamento or item.data_pagamento < today_date or item.data_pagamento > cutoff_date:
             continue
         upcoming_rows.append(
             {
@@ -291,11 +471,12 @@ def commercial_risk_summary(request):
                 "dateText": item.data_pagamento.strftime("%d/%m/%Y"),
                 "dateKey": item.data_pagamento.isoformat(),
                 "valueLabel": _build_value_label(item.faturamento_total_contrato or (_to_number(item.preco) * _to_number(item.volume_fisico)), item.moeda_contrato),
+                "valueColor": "positive",
             }
         )
 
-    for item in physical_payments:
-        if not item.data_pagamento or item.data_pagamento < today_date:
+    for item in upcoming_physical_payments:
+        if not item.data_pagamento or item.data_pagamento < today_date or item.data_pagamento > cutoff_date:
             continue
         upcoming_rows.append(
             {
@@ -308,12 +489,13 @@ def commercial_risk_summary(request):
                 "dateText": item.data_pagamento.strftime("%d/%m/%Y"),
                 "dateKey": item.data_pagamento.isoformat(),
                 "valueLabel": _build_value_label(item.volume, item.unidade),
+                "valueColor": "neutral",
             }
         )
 
-    for item in cash_payments:
+    for item in upcoming_cash_payments:
         cashflow_date = item.data_pagamento or item.data_vencimento
-        if not cashflow_date or cashflow_date < today_date:
+        if not cashflow_date or cashflow_date < today_date or cashflow_date > cutoff_date:
             continue
         upcoming_rows.append(
             {
@@ -326,13 +508,17 @@ def commercial_risk_summary(request):
                 "dateText": cashflow_date.strftime("%d/%m/%Y"),
                 "dateKey": cashflow_date.isoformat(),
                 "valueLabel": _build_value_label(item.valor or item.volume, item.moeda),
+                "valueColor": "negative",
             }
         )
 
-    for item in derivatives:
-        if not item.data_liquidacao or item.data_liquidacao < today_date:
+    for item in upcoming_derivatives:
+        if not item.data_liquidacao or item.data_liquidacao < today_date or item.data_liquidacao > cutoff_date:
             continue
         operation_label = item.nome_da_operacao or item.contrato_derivativo or item.cod_operacao_mae or "Operacao derivativa"
+        # Ajuste MTM: mesma lógica do frontend — cotação ao vivo via TradingView para operações em aberto
+        ajuste_raw, ajuste_moeda = _calculate_derivative_mtm(item, live_quotes_by_ticker, live_usd_brl_rate)
+        ajuste_label = _build_value_label(ajuste_raw, ajuste_moeda, signed=True) if ajuste_moeda else "— 0,00"
         upcoming_rows.append(
             {
                 "recordId": item.id,
@@ -343,15 +529,12 @@ def commercial_risk_summary(request):
                 "dateLabel": "Liquidacao",
                 "dateText": item.data_liquidacao.strftime("%d/%m/%Y"),
                 "dateKey": item.data_liquidacao.isoformat(),
-                "valueLabel": _build_value_label(
-                    item.volume_financeiro_valor or item.volume_fisico_valor or item.numero_lotes,
-                    item.volume_financeiro_moeda or item.volume_fisico_unidade or item.strike_moeda_unidade,
-                ),
+                "valueLabel": ajuste_label,
+                "valueColor": "positive" if ajuste_raw >= 0 else "negative",
             }
         )
 
     upcoming_rows.sort(key=lambda item: item["dateKey"])
-    upcoming_rows = upcoming_rows[:8]
 
     return Response(
         {
