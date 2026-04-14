@@ -59,7 +59,7 @@ from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
 from apps.agenda.views import GoogleCalendarConfigViewSet
 from apps.leads.views import LeadCreateView
-from apps.insights.views import CommercialInsightsView, MissingFieldsIgnoredConfigView, MissingFieldsView
+from apps.insights.views import CommercialInsightsView, MissingFieldsIgnoredConfigView, MissingFieldsView, TableColumnConfigView
 from apps.physical.views import (
     ActualCostViewSet,
     BudgetCostViewSet,
@@ -148,6 +148,7 @@ urlpatterns = [
     path("api/insights/commercialization/", CommercialInsightsView.as_view(), name="commercial_insights"),
     path("api/insights/missing-fields/", MissingFieldsView.as_view(), name="missing_fields_insights"),
     path("api/insights/missing-fields/ignored-config/", MissingFieldsIgnoredConfigView.as_view(), name="missing_fields_ignored_config"),
+    path("api/insights/table-column-config/", TableColumnConfigView.as_view(), name="table_column_config"),
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/dashboard/commercial-risk-summary/", commercial_risk_summary, name="commercial_risk_summary"),

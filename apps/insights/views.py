@@ -2,7 +2,7 @@ from rest_framework import permissions, response, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 
-from .models import MissingFieldIgnoredConfig
+from .models import MissingFieldIgnoredConfig, TableColumnConfig
 from .serializers import MissingFieldIgnoredConfigMutationSerializer
 from .services import (
     build_insights_payload,
@@ -10,6 +10,79 @@ from .services import (
     get_missing_fields_config_option,
     get_missing_fields_config_payload,
 )
+
+
+class TableColumnConfigView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _normalize_keys(self, value):
+        if not isinstance(value, list):
+            return []
+        return [str(k) for k in value if k]
+
+    def _resolve_tenant(self, request, tenant_id=None):
+        """Return the tenant to use. Superusers may pass tenant_id; others use own tenant."""
+        if tenant_id is not None:
+            if not request.user.is_superuser:
+                raise PermissionDenied("Somente superuser pode salvar para outros tenants.")
+            from apps.accounts.models import Tenant
+            try:
+                return Tenant.objects.get(id=tenant_id)
+            except Tenant.DoesNotExist:
+                return None
+        return request.user.tenant
+
+    def get(self, request, *args, **kwargs):
+        configs = TableColumnConfig.objects.filter(tenant=request.user.tenant)
+        payload = {
+            cfg.resource: {
+                "orderedKeys": cfg.ordered_keys,
+                "hiddenKeys": cfg.hidden_keys,
+            }
+            for cfg in configs
+        }
+        return response.Response(payload)
+
+    def put(self, request, *args, **kwargs):
+        resource = str(request.data.get("resource") or "").strip()
+        if not resource:
+            return response.Response(
+                {"detail": "Campo 'resource' obrigatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tenant_id = request.data.get("tenant_id")
+        tenant = self._resolve_tenant(request, tenant_id)
+        if tenant is None:
+            return response.Response({"detail": "Tenant nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        ordered_keys = self._normalize_keys(request.data.get("orderedKeys", []))
+        hidden_keys = self._normalize_keys(request.data.get("hiddenKeys", []))
+
+        cfg, created = TableColumnConfig.objects.update_or_create(
+            tenant=tenant,
+            resource=resource,
+            defaults={"ordered_keys": ordered_keys, "hidden_keys": hidden_keys},
+        )
+
+        return response.Response(
+            {"resource": resource, "orderedKeys": cfg.ordered_keys, "hiddenKeys": cfg.hidden_keys},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, *args, **kwargs):
+        resource = str(request.data.get("resource") or "").strip()
+        if not resource:
+            return response.Response(
+                {"detail": "Campo 'resource' obrigatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        tenant_id = request.data.get("tenant_id")
+        tenant = self._resolve_tenant(request, tenant_id)
+        if tenant is None:
+            return response.Response({"detail": "Tenant nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        TableColumnConfig.objects.filter(tenant=tenant, resource=resource).delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CommercialInsightsView(APIView):

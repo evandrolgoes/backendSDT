@@ -1,6 +1,30 @@
 from django.db import models
 
 
+class TableColumnConfig(models.Model):
+    tenant = models.ForeignKey(
+        "accounts.Tenant",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="table_column_configs",
+    )
+    resource = models.CharField(max_length=120)
+    ordered_keys = models.JSONField(default=list)
+    hidden_keys = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("tenant", "resource")]
+        indexes = [
+            models.Index(fields=["tenant"]),
+            models.Index(fields=["tenant", "resource"]),
+        ]
+
+    def __str__(self):
+        return f"{self.resource} (tenant={self.tenant_id})"
+
+
 class MissingFieldIgnoredConfig(models.Model):
     tenant = models.ForeignKey(
         "accounts.Tenant",
