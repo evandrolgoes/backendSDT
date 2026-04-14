@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     "apps.mass_update",
     "apps.insights",
     "apps.market_summary",
+    "apps.gaming",
 ]
 
 MIDDLEWARE = [

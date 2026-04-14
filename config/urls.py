@@ -72,6 +72,7 @@ from apps.receivables.views import EntryClientViewSet, ReceiptEntryViewSet
 from apps.risk.views import ExposurePositionViewSet, commercial_risk_summary
 from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
 from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
+from apps.gaming.views import GamingSessionViewSet
 
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
@@ -118,6 +119,7 @@ router.register("anotacoes", AnotacaoViewSet, basename="anotacao")
 router.register("agenda-configs", GoogleCalendarConfigViewSet, basename="agenda-config")
 router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-payable")
 router.register("contracts", ContractViewSet, basename="contract")
+router.register("gaming-sessions", GamingSessionViewSet, basename="gaming-session")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
