@@ -1123,14 +1123,17 @@ def import_bubble_derivatives(request):
                 instance.save()
                 for field_name, values in m2m_updates.items():
                     getattr(instance, field_name).set(values)
-
-            audit_helper._create_audit_log("criado", instance, before={}, after=audit_helper._serialize_instance_for_log(instance))
             created_count += 1
         except Exception as exc:
             skipped_count += 1
             warnings.append(f"Linha {index}: erro ao salvar registro ({exc}).")
             print(format_exc())
             continue
+
+        try:
+            audit_helper._create_audit_log("criado", instance, before={}, after=audit_helper._serialize_instance_for_log(instance))
+        except Exception:
+            print(format_exc())
 
         for warning in row_warnings[:5]:
             warnings.append(f"Linha {index}: {warning}")
