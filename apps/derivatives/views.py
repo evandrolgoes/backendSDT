@@ -1,4 +1,5 @@
 import json
+import random
 import re
 from decimal import Decimal, InvalidOperation
 from traceback import format_exc
@@ -440,11 +441,13 @@ def _fetch_json_payload(url, headers=None):
 def _extract_results_and_meta(payload):
     if isinstance(payload, dict) and isinstance(payload.get("response"), dict):
         response = payload["response"]
-        return response.get("results", []), response
+        results = [item for item in response.get("results", []) if isinstance(item, dict)]
+        return results, response
     if isinstance(payload, dict) and isinstance(payload.get("results"), list):
-        return payload.get("results", []), payload
+        results = [item for item in payload.get("results", []) if isinstance(item, dict)]
+        return results, payload
     if isinstance(payload, list):
-        return payload, {}
+        return [item for item in payload if isinstance(item, dict)], {}
     return [], {}
 
 
@@ -1032,12 +1035,14 @@ def inspect_bubble_import(request):
     except (ValueError, json.JSONDecodeError):
         return Response({"detail": "Nao foi possivel interpretar o JSON informado."}, status=status.HTTP_400_BAD_REQUEST)
 
+    remaining = int(_meta.get("remaining") or 0)
     return Response(
         {
             "databaseTargets": _build_import_database_targets(),
             "destinationOptions": _build_import_destination_options(),
             "targetFields": _build_target_field_options(destination),
             "rowsFound": len(rows),
+            "remaining": remaining,
             "urlReturnedEmpty": False,
             "sourceFields": _build_source_field_summary(rows, destination),
             "sampleRows": rows[:3],
@@ -1075,20 +1080,18 @@ def import_bubble_derivatives(request):
     audit_helper = TenantScopedModelViewSet()
     audit_helper.request = request
 
+    remaining = int(_meta.get("remaining") or 0)
+    if remaining > 0:
+        warnings.append(f"Atencao: este JSON contem apenas parte dos registros. Ainda ha {remaining} registro(s) nao incluidos. Cole o proximo lote para importar o restante.")
+
     for index, row in enumerate(rows, start=1):
-        if not isinstance(row, dict):
-            skipped_count += 1
-            warnings.append(f"Linha {index}: formato invalido.")
-            continue
 
         model = target_config["model"]
         import_key = ""
         if model is DerivativeOperation:
             import_key = _normalize_import_key(row.get("Cod operação mãe") or row.get("Cod operacao mae") or row.get("_id"))
         if model is DerivativeOperation and not import_key:
-            skipped_count += 1
-            warnings.append(f"Linha {index}: sem chave de importacao.")
-            continue
+            import_key = f"IMP-{index:04d}-{random.randint(1000, 9999)}"
 
         instance = model()
         if any(field.name == "tenant" for field in model._meta.fields):

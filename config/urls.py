@@ -72,6 +72,7 @@ from apps.risk.views import ExposurePositionViewSet, commercial_risk_summary
 from apps.strategies.views import CropBoardViewSet, HedgePolicyViewSet, StrategyTriggerViewSet, StrategyViewSet, ibge_cities, ibge_states
 from apps.tradingview_scraper.views import TradingViewWatchlistQuoteViewSet
 from apps.gaming.views import GamingSessionViewSet
+from apps.financials.views import DREBalacoView
 
 router = DefaultRouter()
 router.register("tenants", TenantViewSet, basename="tenant")
@@ -151,6 +152,7 @@ urlpatterns = [
     path("api/localidades/estados/", ibge_states, name="ibge_states"),
     path("api/localidades/municipios/", ibge_cities, name="ibge_cities"),
     path("api/dashboard/commercial-risk-summary/", commercial_risk_summary, name="commercial_risk_summary"),
+    path("api/dashboard/dre-balanco/", DREBalacoView.as_view(), name="dre_balanco"),
     path("api/auth/login/", LoginView.as_view(), name="login"),
     path("api/auth/impersonate/<int:user_id>/", ImpersonateUserView.as_view(), name="impersonate_user"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
