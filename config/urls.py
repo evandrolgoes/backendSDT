@@ -7,7 +7,6 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.anotacoes.views import AnotacaoViewSet, anotacoes_health
 from apps.accounts.views import (
     AccessRequestView,
     AdminInvitationViewSet,
@@ -115,7 +114,6 @@ router.register("audit-logs", AuditLogViewSet, basename="audit-log")
 router.register("attachments", AttachmentViewSet, basename="attachment")
 router.register("tradingview-watchlist-quotes", TradingViewWatchlistQuoteViewSet, basename="tradingview-watchlist-quote")
 router.register("market-news-posts", MarketNewsPostViewSet, basename="market-news-post")
-router.register("anotacoes", AnotacaoViewSet, basename="anotacao")
 router.register("agenda-configs", GoogleCalendarConfigViewSet, basename="agenda-config")
 router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-payable")
 router.register("contracts", ContractViewSet, basename="contract")
@@ -131,7 +129,6 @@ urlpatterns = [
     path("api/mercado/government-bond-proxy/", government_bond_proxy, name="government_bond_proxy"),
     path("api/mercado/brazil-macro-proxy/", brazil_macro_proxy, name="brazil_macro_proxy"),
     path("api/mercado/posicao-fundos/", FundPositionSeriesView.as_view(), name="fund_position_series"),
-    path("api/anotacoes/health/", anotacoes_health, name="anotacoes_health"),
     path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
     path("api/import-tools/bubble/targets/", import_bubble_targets, name="import_bubble_targets"),
     path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),

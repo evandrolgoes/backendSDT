@@ -2,9 +2,10 @@ from io import BytesIO
 
 from django.http import FileResponse, Http404
 from apps.core.viewsets import TenantScopedModelViewSet
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from .models import Attachment, AuditLog
 from .serializers import AttachmentSerializer, AuditLogSerializer
@@ -13,7 +14,7 @@ from .serializers import AttachmentSerializer, AuditLogSerializer
 class AuditLogViewSet(TenantScopedModelViewSet):
     queryset = AuditLog.objects.select_related("tenant", "user", "content_type").all()
     serializer_class = AuditLogSerializer
-    filterset_fields = ["user", "action", "content_type", "formulario", "object_id"]
+    filterset_fields = ["user", "action", "content_type", "object_id"]
     search_fields = ["description", "formulario"]
     http_method_names = ["get", "head", "options", "delete"]
 
@@ -21,11 +22,14 @@ class AuditLogViewSet(TenantScopedModelViewSet):
         queryset = super().get_queryset()
         created_at_from = self.request.query_params.get("created_at_from")
         created_at_to = self.request.query_params.get("created_at_to")
+        formulario = self.request.query_params.get("formulario")
 
         if created_at_from:
             queryset = queryset.filter(created_at__date__gte=created_at_from)
         if created_at_to:
             queryset = queryset.filter(created_at__date__lte=created_at_to)
+        if formulario:
+            queryset = queryset.filter(formulario__icontains=formulario)
 
         return queryset
 
@@ -33,6 +37,16 @@ class AuditLogViewSet(TenantScopedModelViewSet):
         if not request.user.is_superuser:
             raise PermissionDenied("Somente superuser pode excluir registros do log.")
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=["get"], url_path="formularios")
+    def formularios(self, request):
+        values = (
+            self.get_queryset()
+            .order_by("formulario")
+            .values_list("formulario", flat=True)
+            .distinct()
+        )
+        return Response(sorted(v for v in values if v))
 
 
 class AttachmentViewSet(TenantScopedModelViewSet):

@@ -19,7 +19,6 @@ AVAILABLE_MODULES = [
     ("cad_groups", "Cadastro: Grupos"),
     ("cad_subgroups", "Cadastro: Subgrupos"),
     ("cad_counterparties", "Cadastro: Contrapartes"),
-    ("cad_anotacoes", "Cadastro: Anotacoes"),
     ("ops_physical_quotes", "Operacoes: Cotacoes Fisico"),
     ("ops_budget_costs", "Operacoes: Custo Orcamento"),
     ("ops_actual_costs", "Operacoes: Custo Realizado"),

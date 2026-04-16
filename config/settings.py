@@ -93,7 +93,6 @@ INSTALLED_APPS = [
     "apps.strategies",
     "apps.marketdata",
     "apps.mercado",
-    "apps.anotacoes",
     "apps.contrato",
     "apps.payables",
     "apps.risk",

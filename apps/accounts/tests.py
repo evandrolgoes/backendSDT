@@ -3,7 +3,6 @@ from rest_framework.test import APIClient
 
 from apps.accounts.constants import AVAILABLE_MODULE_CODES
 from apps.accounts.models import Invitation, Tenant, User
-from apps.anotacoes.models import Anotacao
 from apps.clients.models import EconomicGroup, SubGroup
 
 
@@ -211,23 +210,6 @@ class GroupPrivacyScopeTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["dashboard_filter"]["grupo"], [str(self.allowed_group.id)])
         self.assertEqual(response.data["dashboard_filter"]["subgrupo"], [str(self.allowed_subgroup.id)])
-
-    def test_many_to_many_group_and_subgroup_payloads_are_trimmed(self):
-        anotacao = Anotacao.objects.create(
-            tenant=self.tenant,
-            created_by=self.user,
-            modificado_por=self.user,
-            titulo="Nota privada",
-        )
-        anotacao.grupos.set([self.allowed_group, self.blocked_group])
-        anotacao.subgrupos.set([self.allowed_subgroup, self.blocked_subgroup])
-
-        response = self.client.get("/api/anotacoes/")
-        self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(len(response.data["results"]), 1)
-        row = response.data["results"][0]
-        self.assertEqual(row["grupos"], [self.allowed_group.id])
-        self.assertEqual(row["subgrupos"], [self.allowed_subgroup.id])
 
     def test_usuario_tenant_user_keeps_group_scope_from_access_lists_even_with_different_tenant(self):
         usuario_tenant = Tenant.objects.create(name="Usuarios", slug="usuario")
