@@ -1,9 +1,10 @@
+import re
 import urllib.parse
 import urllib.request
 import csv
 import io
 import json
-from datetime import timedelta
+from datetime import timedelta, date
 
 from django.http import JsonResponse, HttpResponse
 from django.contrib.contenttypes.models import ContentType
@@ -33,12 +34,17 @@ YAHOO_SYMBOL_ALIASES = {
     "ZS=F": "ZS=F",
     "ZC=F": "ZC=F",
     "ZW=F": "ZW=F",
+    "KE=F": "KE=F",
     "ZM=F": "ZM=F",
     "ZL=F": "ZL=F",
+    "ZO=F": "ZO=F",
+    "ZR=F": "ZR=F",
     "SB=F": "SB=F",
     "KC=F": "KC=F",
     "CC=F": "CC=F",
     "CT=F": "CT=F",
+    "OJ=F": "OJ=F",
+    "LBS=F": "LBS=F",
     "LE=F": "LE=F",
     "GF=F": "GF=F",
     "HE=F": "HE=F",
@@ -49,6 +55,7 @@ YAHOO_SYMBOL_ALIASES = {
     "BRL=X": "BRL=X",
     "USDBRL": "BRL=X",
     "USDBRL=X": "BRL=X",
+    "6L=F": "6L=F",
 }
 
 FRED_SERIES_ALIASES = {
@@ -98,6 +105,62 @@ BRAZIL_MACRO_SYMBOL_ALIASES = {
     "BRGDPYY": "BRGDPYY",
 }
 
+# ── Futures contract validation ──────────────────────────────────────────────
+# Accepted: {BASE}{MONTH_CODE}{YY}.{EXCHANGE}   e.g. ZSK26.CBT, KCN26.NYB
+
+_FUTURES_BASES = frozenset({
+    "ZS", "ZC", "ZW", "KE", "ZM", "ZL", "ZO", "ZR",  # grãos CBOT
+    "KC", "SB", "CC", "CT", "OJ",                      # softs ICE
+    "LE", "GF", "HE",                                   # carnes CME
+    "CL", "BZ",                                         # energia NYMEX
+    "GC", "SI",                                         # metais COMEX
+})
+_FUTURES_MONTH_CODES = frozenset("FGHJKMNQUVXZ")
+_FUTURES_EXCHANGES = frozenset({"CBT", "NYB", "CME", "NYM", "CMX"})
+_FUTURES_CONTRACT_RE = re.compile(r"^([A-Z]{2,3})([FGHJKMNQUVXZ])(\d{2})\.([A-Z]{2,3})$")
+# 6L = Brazilian Real futures (CME) — alphanumeric base, handled separately
+_6L_CONTRACT_RE = re.compile(r"^6L([FGHJKMNQUVXZ])(\d{2})\.CME$")
+
+
+def _resolve_symbol(requested_symbol):
+    """
+    Return the Yahoo Finance symbol to fetch, or None if not allowed.
+    Accepts:
+      1. Symbols in YAHOO_SYMBOL_ALIASES  (e.g. ZS=F, BRL=X, 6L=F)
+      2. Standard futures contracts        (e.g. ZSK26.CBT, KCN26.NYB)
+      3. Brazilian Real futures            (e.g. 6LK26.CME, 6LM26.CME)
+    """
+    # 1 – explicit allowlist
+    if requested_symbol in YAHOO_SYMBOL_ALIASES:
+        return YAHOO_SYMBOL_ALIASES[requested_symbol]
+
+    # 2 – Brazilian Real futures  (6L{M}{YY}.CME)
+    m6l = _6L_CONTRACT_RE.match(requested_symbol)
+    if m6l:
+        month_code, year_str = m6l.groups()
+        year_2d = int(year_str)
+        current_year_2d = date.today().year % 100
+        if current_year_2d - 1 <= year_2d <= current_year_2d + 5:
+            return requested_symbol
+
+    # 3 – standard commodity futures contract pattern
+    m = _FUTURES_CONTRACT_RE.match(requested_symbol)
+    if m:
+        base, month_code, year_str, exchange = m.groups()
+        if base not in _FUTURES_BASES:
+            return None
+        if month_code not in _FUTURES_MONTH_CODES:
+            return None
+        if exchange not in _FUTURES_EXCHANGES:
+            return None
+        year_2d = int(year_str)
+        current_year_2d = date.today().year % 100
+        if not (current_year_2d - 1 <= year_2d <= current_year_2d + 5):
+            return None
+        return requested_symbol  # use as-is
+
+    return None
+
 
 def _iso_to_brazil_date(iso_date):
     year, month, day = str(iso_date or "").split("-")
@@ -130,7 +193,7 @@ def yahoo_finance_proxy(request):
     requested_symbol = request.GET.get("symbol", "").strip().upper()
     period1 = request.GET.get("period1", "").strip()
     period2 = request.GET.get("period2", "").strip()
-    symbol = YAHOO_SYMBOL_ALIASES.get(requested_symbol, "")
+    symbol = _resolve_symbol(requested_symbol)
 
     if not requested_symbol or not period1 or not period2:
         return JsonResponse({"error": "Missing parameters"}, status=400)
