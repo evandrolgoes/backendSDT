@@ -3,7 +3,7 @@ import sys
 import threading
 import time
 
-from .services import DEFAULT_TRADINGVIEW_WATCHLIST_URL, sync_watchlist_to_db
+from .services import sync_auto_contracts
 
 SYNC_INTERVAL_SECONDS = 60
 _scheduler_started = False
@@ -40,7 +40,7 @@ def _should_start_scheduler():
 def _sync_loop():
     while True:
         try:
-            sync_watchlist_to_db(DEFAULT_TRADINGVIEW_WATCHLIST_URL)
+            sync_auto_contracts()
         except Exception:
             # Keep the backend running even if an external sync fails.
             pass

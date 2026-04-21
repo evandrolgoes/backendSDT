@@ -76,6 +76,15 @@ class Exchange(models.Model):
     moeda_cmdtye = models.CharField(max_length=20, blank=True)
     moeda_unidade_padrao = models.CharField(max_length=60, blank=True)
     fator_conversao_unidade_padrao_cultura = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    # Configuração TradingView — geração automática de contratos futuros
+    tv_symbol_fmt  = models.CharField(max_length=80, blank=True,
+        help_text="Formato do símbolo TradingView (ano 4 dígitos). Ex: BMFBOVESPA:DOL{month}{year4} ou CBOT:ZS{month}{year4}")
+    tv_ticker_fmt  = models.CharField(max_length=60, blank=True,
+        help_text="Formato do ticker no DB (ano 2 dígitos). Ex: DOL{month}{year} ou ZS{month}{year}")
+    tv_months      = models.CharField(max_length=60, blank=True,
+        help_text="Meses de vencimento separados por vírgula. Ex: 1,2,3,4,5,6,7,8,9,10,11,12")
+    tv_n_contracts = models.PositiveSmallIntegerField(null=True, blank=True,
+        help_text="Quantos vencimentos futuros manter simultaneamente.")
 
     class Meta:
         ordering = ["nome"]

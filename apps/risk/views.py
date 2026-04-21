@@ -13,7 +13,7 @@ from apps.core.privacy import apply_group_privacy_scope
 from apps.strategies.models import CropBoard, HedgePolicy
 from apps.tradingview_scraper.models import TradingViewWatchlistQuote
 from apps.tradingview_scraper.serializers import TradingViewWatchlistQuoteSerializer
-from apps.tradingview_scraper.services import trigger_watchlist_refresh_async
+from apps.tradingview_scraper.services import trigger_contracts_refresh_async
 
 from .models import ExposurePosition
 from .serializers import ExposurePositionSerializer
@@ -245,7 +245,7 @@ def _format_strike_montagem_summary_label(value, unit):
 def commercial_risk_summary(request):
     user = request.user
 
-    trigger_watchlist_refresh_async(max_age_minutes=5)
+    trigger_contracts_refresh_async(max_age_minutes=5)
 
     crop_boards_qs = _apply_common_dashboard_filters(
         _scope_queryset(
