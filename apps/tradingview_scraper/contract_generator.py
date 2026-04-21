@@ -41,14 +41,14 @@ CONTRACTS_CONFIG = [
         "symbol_fmt": "BMFBOVESPA:DOL{month}{year4}",
         "ticker_fmt": "DOL{month}{year}",
         "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        "n": 6,
+        "n": 60,
         "section": "DOLAR FWD",
     },
     {
         "symbol_fmt": "BMFBOVESPA:WDO{month}{year4}",
         "ticker_fmt": "WDO{month}{year}",
         "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        "n": 6,
+        "n": 60,
         "section": "DOLAR FWD",
     },
     # ── MILHO B3 ─────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ def generate_active_symbols(contracts_config=None, reference_date=None):
         found = 0
         iterations = 0
 
-        while found < cfg["n"] and iterations < 36:
+        while found < cfg["n"] and iterations < 120:
             iterations += 1
             if month in cfg["months"]:
                 m_code = MONTH_CODE[month]
