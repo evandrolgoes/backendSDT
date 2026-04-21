@@ -44,7 +44,7 @@ class TradingViewScraperError(Exception):
 
 def _fetch_text(url):
     request = Request(url, headers=DEFAULT_HEADERS)
-    with urlopen(request, timeout=30) as response:
+    with urlopen(request, timeout=10) as response:
         return response.read().decode("utf-8", errors="replace")
 
 
@@ -52,7 +52,7 @@ def _post_json(url, payload):
     body = json.dumps(payload).encode("utf-8")
     headers = {**DEFAULT_HEADERS, "Content-Type": "application/json"}
     request = Request(url, data=body, headers=headers, method="POST")
-    with urlopen(request, timeout=30) as response:
+    with urlopen(request, timeout=10) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -541,7 +541,7 @@ def _fetch_yahoo_finance_price(tv_symbol_fmt, date_str):
     )
     try:
         request = Request(url, headers=_YAHOO_FINANCE_HEADERS)
-        with urlopen(request, timeout=15) as response:
+        with urlopen(request, timeout=10) as response:
             data = json.loads(response.read().decode("utf-8"))
     except Exception:
         return None
