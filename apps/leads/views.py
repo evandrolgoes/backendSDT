@@ -2,12 +2,19 @@ import logging
 
 from django.conf import settings
 from django.core.mail import send_mail
-from rest_framework import permissions, response, status
+from rest_framework import permissions, response, status, viewsets
 from rest_framework.views import APIView
 
+from .models import Lead
 from .serializers import LeadSerializer
 
 logger = logging.getLogger(__name__)
+
+
+class LeadViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = LeadSerializer
+    queryset = Lead.objects.all()
 
 
 class LeadCreateView(APIView):

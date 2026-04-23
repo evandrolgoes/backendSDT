@@ -57,7 +57,7 @@ from apps.other_cash_outflows.views import OtherCashOutflowViewSet
 from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
 from apps.agenda.views import GoogleCalendarConfigViewSet
-from apps.leads.views import LeadCreateView
+from apps.leads.views import LeadCreateView, LeadViewSet
 from apps.insights.views import CommercialInsightsView, MissingFieldsIgnoredConfigView, MissingFieldsView, TableColumnConfigView
 from apps.physical.views import (
     ActualCostViewSet,
@@ -119,6 +119,7 @@ router.register("agenda-configs", GoogleCalendarConfigViewSet, basename="agenda-
 router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-payable")
 router.register("contracts", ContractViewSet, basename="contract")
 router.register("gaming-sessions", GamingSessionViewSet, basename="gaming-session")
+router.register("leads", LeadViewSet, basename="lead")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
