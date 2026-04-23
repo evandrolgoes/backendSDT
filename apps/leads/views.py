@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class LeadViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = LeadSerializer
     queryset = Lead.objects.all()
 
