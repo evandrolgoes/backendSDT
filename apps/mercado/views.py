@@ -11,7 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from rest_framework import parsers, status
 from rest_framework.decorators import action
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.permissions import AllowAny, BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -410,6 +410,8 @@ def brazil_macro_proxy(request):
 
 
 class FundPositionSeriesView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request, *args, **kwargs):
         series_id = request.query_params.get("series", "soja")
         try:
