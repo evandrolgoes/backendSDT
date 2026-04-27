@@ -570,7 +570,7 @@ def _call_openai_market_summary(payload):
         raise RuntimeError("Biblioteca OpenAI indisponivel no backend.") from exc
 
     model = getattr(settings, "OPENAI_MARKET_SUMMARY_MODEL", "") or getattr(settings, "OPENAI_INSIGHTS_MODEL", "gpt-5-mini")
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=60.0, max_retries=0)
 
     instructions = (
         "Voce e um analista senior de mercado agricola brasileiro. "

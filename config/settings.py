@@ -254,6 +254,7 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=cast_bool, default=False)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=cast_bool, default=False)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", cast=int, default=10)
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10_485_760  # 10 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10_485_760

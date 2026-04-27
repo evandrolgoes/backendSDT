@@ -1175,7 +1175,7 @@ def _call_openai_insights(payload, local_insights):
         return None
 
     model = getattr(settings, "OPENAI_INSIGHTS_MODEL", "gpt-5-mini")
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=20.0, max_retries=0)
 
     prompt_payload = {
         "metrics": payload["metrics"],
