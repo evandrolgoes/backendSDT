@@ -6,7 +6,11 @@ from rest_framework.response import Response
 from apps.catalog.models import Exchange
 from .models import TradingViewWatchlistQuote
 from .serializers import TradingViewWatchlistQuoteSerializer
-from .services import fetch_continuous_contract_price, sync_auto_contracts
+from .services import (
+    fetch_continuous_contract_price,
+    sync_auto_contracts,
+    trigger_contracts_refresh_async,
+)
 
 
 class TradingViewWatchlistQuoteViewSet(viewsets.ReadOnlyModelViewSet):
@@ -22,8 +26,13 @@ class TradingViewWatchlistQuoteViewSet(viewsets.ReadOnlyModelViewSet):
             return [IsAuthenticated()]
         return [permission() for permission in self.permission_classes]
 
+    def list(self, request, *args, **kwargs):
+        trigger_contracts_refresh_async()
+        return super().list(request, *args, **kwargs)
+
     @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="ticker-price")
     def ticker_price(self, request):
+        trigger_contracts_refresh_async()
         queryset = self.filter_queryset(self.get_queryset()).order_by("sort_order", "ticker")
         payload = [
             {
