@@ -1,3 +1,7 @@
+import hashlib
+import json
+
+from django.core.cache import cache
 from django.db.models import Q
 from functools import reduce
 from rest_framework.decorators import api_view, permission_classes
@@ -245,11 +249,24 @@ def _format_strike_montagem_summary_label(value, unit):
 def commercial_risk_summary(request):
     user = request.user
 
+    cache_key = "crs:" + hashlib.md5(
+        json.dumps(
+            {
+                "u": user.id,
+                "q": {k: sorted(request.query_params.getlist(k)) for k in sorted(request.query_params.keys())},
+            },
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    cached_payload = cache.get(cache_key)
+    if cached_payload is not None:
+        return Response(cached_payload)
+
     trigger_contracts_refresh_async(max_age_minutes=5)
 
     crop_boards_qs = _apply_common_dashboard_filters(
         _scope_queryset(
-            CropBoard.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
+            CropBoard.objects.all(),
             user,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
@@ -260,7 +277,8 @@ def commercial_risk_summary(request):
         culture_fields=("cultura",),
         season_fields=("safra",),
     )
-    crop_boards = list(crop_boards_qs)
+    crop_boards_data = list(crop_boards_qs.values_list("producao_total", "area"))
+    crop_boards_count = len(crop_boards_data)
 
     physical_sales_qs = _apply_common_dashboard_filters(
         _scope_queryset(
@@ -325,9 +343,6 @@ def commercial_risk_summary(request):
         )
     )
 
-    # Janela de "Próximos vencimentos" — calculada aqui para empurrar o filtro
-    # de data para o nível do queryset e evitar carregar tabelas inteiras só
-    # para descartar a maior parte em Python.
     from django.utils import timezone
     from datetime import datetime, timedelta
 
@@ -339,66 +354,29 @@ def commercial_risk_summary(request):
         except ValueError:
             pass
     cutoff_date = today_date + timedelta(days=90)
-    upcoming_window = (today_date, cutoff_date)
 
-    upcoming_physical_sales = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                PhysicalSale.objects.select_related("grupo", "subgrupo", "cultura", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
-            group_fields=("grupo",),
-            subgroup_fields=("subgrupo",),
-        ).filter(data_pagamento__range=upcoming_window)
-    )
+    upcoming_physical_sales = [
+        item for item in physical_sales
+        if item.data_pagamento and today_date <= item.data_pagamento <= cutoff_date
+    ]
 
-    upcoming_physical_payments = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                PhysicalPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
-            group_fields=("grupo",),
-            subgroup_fields=("subgrupo",),
-        ).filter(data_pagamento__range=upcoming_window)
-    )
+    upcoming_physical_payments = [
+        item for item in physical_payments
+        if item.data_pagamento and today_date <= item.data_pagamento <= cutoff_date
+    ]
 
-    upcoming_cash_payments = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                CashPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
-            group_fields=("grupo",),
-            subgroup_fields=("subgrupo",),
-        ).filter(
-            Q(data_pagamento__range=upcoming_window)
-            | (Q(data_pagamento__isnull=True) & Q(data_vencimento__range=upcoming_window))
+    upcoming_cash_payments = [
+        item for item in cash_payments
+        if (
+            (item.data_pagamento and today_date <= item.data_pagamento <= cutoff_date)
+            or (item.data_pagamento is None and item.data_vencimento and today_date <= item.data_vencimento <= cutoff_date)
         )
-    )
+    ]
 
-    upcoming_derivatives = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                DerivativeOperation.objects.select_related("grupo", "subgrupo", "ativo", "destino_cultura", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
-            group_fields=("grupo",),
-            subgroup_fields=("subgrupo",),
-        ).filter(data_liquidacao__range=upcoming_window)
-    )
+    upcoming_derivatives = [
+        item for item in derivatives
+        if item.data_liquidacao and today_date <= item.data_liquidacao <= cutoff_date
+    ]
 
     hedge_policies_count = _apply_common_dashboard_filters(
         _scope_queryset(
@@ -429,12 +407,11 @@ def commercial_risk_summary(request):
     ).count()
 
     physical_quotes_qs = _apply_common_dashboard_filters(
-        _scope_queryset(PhysicalQuote.objects.select_related("safra"), user),
+        _scope_queryset(PhysicalQuote.objects.all(), user),
         request,
         season_fields=("safra",),
     )
-    physical_quotes = list(physical_quotes_qs)
-    physical_quotes_count = len(physical_quotes)
+    physical_quotes_count = physical_quotes_qs.count()
 
     market_news_qs = _scope_queryset(
         MarketNewsPost.objects.select_related("tenant", "created_by", "published_by"),
@@ -461,13 +438,13 @@ def commercial_risk_summary(request):
         or 0.0
     )
 
-    production_total = sum(abs(_to_number(item.producao_total)) for item in crop_boards)
-    total_area = sum(abs(_to_number(item.area)) for item in crop_boards)
+    production_total = sum(abs(_to_number(producao)) for producao, _ in crop_boards_data)
+    total_area = sum(abs(_to_number(area)) for _, area in crop_boards_data)
     physical_payment_volume = sum(abs(_to_number(item.volume)) for item in physical_payments)
     net_production_volume = max(production_total - physical_payment_volume, 0)
 
     forms = [
-        {"label": "Quadro Safra", "path": "/quadro-safra", "count": len(crop_boards), "hint": "Base de produção e cobertura"},
+        {"label": "Quadro Safra", "path": "/quadro-safra", "count": crop_boards_count, "hint": "Base de produção e cobertura"},
         {"label": "Vendas Físico", "path": "/vendas-fisico", "count": len(physical_sales), "hint": "Contratos físicos negociados"},
         {"label": "Derivativos", "path": "/derivativos", "count": len(derivatives), "hint": "Operações em bolsa e câmbio"},
         {"label": "Cotações Físico", "path": "/cotacoes-fisico", "count": physical_quotes_count, "hint": "Referência de mercado / MTM"},
@@ -600,18 +577,18 @@ def commercial_risk_summary(request):
 
     upcoming_rows.sort(key=lambda item: item["dateKey"])
 
-    return Response(
-        {
-            "productionSummary": {
-                "productionTotal": production_total,
-                "totalArea": total_area,
-                "physicalPaymentVolume": physical_payment_volume,
-                "netProductionVolume": net_production_volume,
-            },
-            "marketQuotes": TradingViewWatchlistQuoteSerializer(market_quotes_rows, many=True).data,
-            "marketNewsPosts": MarketNewsPostSerializer(market_news_rows, many=True).data,
-            "upcomingMaturityRows": upcoming_rows,
-            "formCompletionRows": form_completion_rows,
-            "formCompletionSummary": form_completion_summary,
-        }
-    )
+    payload = {
+        "productionSummary": {
+            "productionTotal": production_total,
+            "totalArea": total_area,
+            "physicalPaymentVolume": physical_payment_volume,
+            "netProductionVolume": net_production_volume,
+        },
+        "marketQuotes": TradingViewWatchlistQuoteSerializer(market_quotes_rows, many=True).data,
+        "marketNewsPosts": MarketNewsPostSerializer(market_news_rows, many=True).data,
+        "upcomingMaturityRows": upcoming_rows,
+        "formCompletionRows": form_completion_rows,
+        "formCompletionSummary": form_completion_summary,
+    }
+    cache.set(cache_key, payload, timeout=90)
+    return Response(payload)
