@@ -325,6 +325,22 @@ def commercial_risk_summary(request):
         )
     )
 
+    # Janela de "Próximos vencimentos" — calculada aqui para empurrar o filtro
+    # de data para o nível do queryset e evitar carregar tabelas inteiras só
+    # para descartar a maior parte em Python.
+    from django.utils import timezone
+    from datetime import datetime, timedelta
+
+    today_param = request.query_params.get("today")
+    today_date = timezone.localdate()
+    if today_param:
+        try:
+            today_date = datetime.strptime(today_param, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    cutoff_date = today_date + timedelta(days=90)
+    upcoming_window = (today_date, cutoff_date)
+
     upcoming_physical_sales = list(
         _apply_common_dashboard_filters(
             _scope_queryset(
@@ -336,7 +352,7 @@ def commercial_risk_summary(request):
             request,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
-        )
+        ).filter(data_pagamento__range=upcoming_window)
     )
 
     upcoming_physical_payments = list(
@@ -350,7 +366,7 @@ def commercial_risk_summary(request):
             request,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
-        )
+        ).filter(data_pagamento__range=upcoming_window)
     )
 
     upcoming_cash_payments = list(
@@ -364,6 +380,9 @@ def commercial_risk_summary(request):
             request,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
+        ).filter(
+            Q(data_pagamento__range=upcoming_window)
+            | (Q(data_pagamento__isnull=True) & Q(data_vencimento__range=upcoming_window))
         )
     )
 
@@ -378,7 +397,7 @@ def commercial_risk_summary(request):
             request,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
-        )
+        ).filter(data_liquidacao__range=upcoming_window)
     )
 
     hedge_policies_count = _apply_common_dashboard_filters(
@@ -491,21 +510,6 @@ def commercial_risk_summary(request):
         return f"{amount:,.0f}".replace(",", ".") + (f" {unit}" if unit else "")
 
     upcoming_rows = []
-    today = request.query_params.get("today")
-
-    from django.utils import timezone
-    from datetime import datetime
-
-    from datetime import timedelta
-
-    today_date = timezone.localdate()
-    if today:
-        try:
-            today_date = datetime.strptime(today, "%Y-%m-%d").date()
-        except ValueError:
-            pass
-
-    cutoff_date = today_date + timedelta(days=90)
 
     for item in upcoming_physical_sales:
         if not item.data_pagamento or item.data_pagamento < today_date or item.data_pagamento > cutoff_date:
