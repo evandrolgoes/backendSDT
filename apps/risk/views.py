@@ -2,7 +2,8 @@ import hashlib
 import json
 
 from django.core.cache import cache
-from django.db.models import Q
+from django.db.models import Q, Sum, Value
+from django.db.models.functions import Abs, Coalesce
 from functools import reduce
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -264,6 +265,18 @@ def commercial_risk_summary(request):
 
     trigger_contracts_refresh_async(max_age_minutes=5)
 
+    from django.utils import timezone
+    from datetime import datetime, timedelta
+
+    today_param = request.query_params.get("today")
+    today_date = timezone.localdate()
+    if today_param:
+        try:
+            today_date = datetime.strptime(today_param, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    cutoff_date = today_date + timedelta(days=90)
+
     crop_boards_qs = _apply_common_dashboard_filters(
         _scope_queryset(
             CropBoard.objects.all(),
@@ -277,8 +290,14 @@ def commercial_risk_summary(request):
         culture_fields=("cultura",),
         season_fields=("safra",),
     )
-    crop_boards_data = list(crop_boards_qs.values_list("producao_total", "area"))
-    crop_boards_count = len(crop_boards_data)
+    crop_boards_aggregates = crop_boards_qs.aggregate(
+        production_total=Coalesce(Sum(Abs(Coalesce("producao_total", Value(0)))), Value(0)),
+        total_area=Coalesce(Sum(Abs(Coalesce("area", Value(0)))), Value(0)),
+        row_count=Coalesce(Sum(Value(1)), Value(0)),
+    )
+    crop_boards_count = int(crop_boards_aggregates["row_count"] or 0)
+    production_total = float(crop_boards_aggregates["production_total"] or 0)
+    total_area = float(crop_boards_aggregates["total_area"] or 0)
 
     physical_sales_qs = _apply_common_dashboard_filters(
         _scope_queryset(
@@ -293,90 +312,85 @@ def commercial_risk_summary(request):
         culture_fields=("cultura",),
         season_fields=("safra",),
     )
-    physical_sales = list(physical_sales_qs)
-
-    physical_payments = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                PhysicalPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
-            group_fields=("grupo",),
-            subgroup_fields=("subgrupo",),
-            culture_fields=("fazer_frente_com",),
-            season_fields=("safra",),
+    physical_sales_count = physical_sales_qs.count()
+    upcoming_physical_sales = list(
+        physical_sales_qs.filter(
+            data_pagamento__gte=today_date,
+            data_pagamento__lte=cutoff_date,
         )
     )
 
-    cash_payments = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                CashPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
+    physical_payments_qs = _apply_common_dashboard_filters(
+        _scope_queryset(
+            PhysicalPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
+            user,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
-            culture_fields=("fazer_frente_com",),
-            season_fields=("safra",),
+        ),
+        request,
+        group_fields=("grupo",),
+        subgroup_fields=("subgrupo",),
+        culture_fields=("fazer_frente_com",),
+        season_fields=("safra",),
+    )
+    physical_payments_aggregates = physical_payments_qs.aggregate(
+        volume_total=Coalesce(Sum(Abs(Coalesce("volume", Value(0)))), Value(0)),
+        row_count=Coalesce(Sum(Value(1)), Value(0)),
+    )
+    physical_payments_count = int(physical_payments_aggregates["row_count"] or 0)
+    physical_payment_volume = float(physical_payments_aggregates["volume_total"] or 0)
+    upcoming_physical_payments = list(
+        physical_payments_qs.filter(
+            data_pagamento__gte=today_date,
+            data_pagamento__lte=cutoff_date,
         )
     )
 
-    derivatives = list(
-        _apply_common_dashboard_filters(
-            _scope_queryset(
-                DerivativeOperation.objects.select_related("grupo", "subgrupo", "ativo", "destino_cultura", "safra"),
-                user,
-                group_fields=("grupo",),
-                subgroup_fields=("subgrupo",),
-            ),
-            request,
+    cash_payments_qs = _apply_common_dashboard_filters(
+        _scope_queryset(
+            CashPayment.objects.select_related("grupo", "subgrupo", "fazer_frente_com", "safra"),
+            user,
             group_fields=("grupo",),
             subgroup_fields=("subgrupo",),
-            culture_fields=("ativo", "destino_cultura"),
-            season_fields=("safra",),
+        ),
+        request,
+        group_fields=("grupo",),
+        subgroup_fields=("subgrupo",),
+        culture_fields=("fazer_frente_com",),
+        season_fields=("safra",),
+    )
+    cash_payments_count = cash_payments_qs.count()
+    upcoming_cash_payments = list(
+        cash_payments_qs.filter(
+            Q(data_pagamento__gte=today_date, data_pagamento__lte=cutoff_date)
+            | Q(
+                data_pagamento__isnull=True,
+                data_vencimento__gte=today_date,
+                data_vencimento__lte=cutoff_date,
+            )
         )
     )
 
-    from django.utils import timezone
-    from datetime import datetime, timedelta
-
-    today_param = request.query_params.get("today")
-    today_date = timezone.localdate()
-    if today_param:
-        try:
-            today_date = datetime.strptime(today_param, "%Y-%m-%d").date()
-        except ValueError:
-            pass
-    cutoff_date = today_date + timedelta(days=90)
-
-    upcoming_physical_sales = [
-        item for item in physical_sales
-        if item.data_pagamento and today_date <= item.data_pagamento <= cutoff_date
-    ]
-
-    upcoming_physical_payments = [
-        item for item in physical_payments
-        if item.data_pagamento and today_date <= item.data_pagamento <= cutoff_date
-    ]
-
-    upcoming_cash_payments = [
-        item for item in cash_payments
-        if (
-            (item.data_pagamento and today_date <= item.data_pagamento <= cutoff_date)
-            or (item.data_pagamento is None and item.data_vencimento and today_date <= item.data_vencimento <= cutoff_date)
+    derivatives_qs = _apply_common_dashboard_filters(
+        _scope_queryset(
+            DerivativeOperation.objects.select_related("grupo", "subgrupo", "ativo", "destino_cultura", "safra"),
+            user,
+            group_fields=("grupo",),
+            subgroup_fields=("subgrupo",),
+        ),
+        request,
+        group_fields=("grupo",),
+        subgroup_fields=("subgrupo",),
+        culture_fields=("ativo", "destino_cultura"),
+        season_fields=("safra",),
+    )
+    derivatives_count = derivatives_qs.count()
+    upcoming_derivatives = list(
+        derivatives_qs.filter(
+            data_liquidacao__gte=today_date,
+            data_liquidacao__lte=cutoff_date,
         )
-    ]
-
-    upcoming_derivatives = [
-        item for item in derivatives
-        if item.data_liquidacao and today_date <= item.data_liquidacao <= cutoff_date
-    ]
+    )
 
     hedge_policies_count = _apply_common_dashboard_filters(
         _scope_queryset(
@@ -438,20 +452,17 @@ def commercial_risk_summary(request):
         or 0.0
     )
 
-    production_total = sum(abs(_to_number(producao)) for producao, _ in crop_boards_data)
-    total_area = sum(abs(_to_number(area)) for _, area in crop_boards_data)
-    physical_payment_volume = sum(abs(_to_number(item.volume)) for item in physical_payments)
     net_production_volume = max(production_total - physical_payment_volume, 0)
 
     forms = [
         {"label": "Quadro Safra", "path": "/quadro-safra", "count": crop_boards_count, "hint": "Base de produção e cobertura"},
-        {"label": "Vendas Físico", "path": "/vendas-fisico", "count": len(physical_sales), "hint": "Contratos físicos negociados"},
-        {"label": "Derivativos", "path": "/derivativos", "count": len(derivatives), "hint": "Operações em bolsa e câmbio"},
+        {"label": "Vendas Físico", "path": "/vendas-fisico", "count": physical_sales_count, "hint": "Contratos físicos negociados"},
+        {"label": "Derivativos", "path": "/derivativos", "count": derivatives_count, "hint": "Operações em bolsa e câmbio"},
         {"label": "Cotações Físico", "path": "/cotacoes-fisico", "count": physical_quotes_count, "hint": "Referência de mercado / MTM"},
         {"label": "Política de Hedge", "path": "/politica-hedge", "count": hedge_policies_count, "hint": "Faixas e disciplina de risco"},
         {"label": "Custo Orçamento", "path": "/custo-orcamento", "count": budget_costs_count, "hint": "Base de margem e cobertura"},
-        {"label": "Pgtos Físico", "path": "/pgtos-fisico", "count": len(physical_payments), "hint": "Fluxo operacional do físico"},
-        {"label": "Empréstimos", "path": "/pgtos-caixa", "count": len(cash_payments), "hint": "Saídas financeiras do caixa"},
+        {"label": "Pgtos Físico", "path": "/pgtos-fisico", "count": physical_payments_count, "hint": "Fluxo operacional do físico"},
+        {"label": "Empréstimos", "path": "/pgtos-caixa", "count": cash_payments_count, "hint": "Saídas financeiras do caixa"},
     ]
     form_completion_rows = [{**item, "status": "Preenchido" if item["count"] > 0 else "Pendente"} for item in forms]
     filled_forms = sum(1 for item in form_completion_rows if item["count"] > 0)
