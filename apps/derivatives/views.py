@@ -3,7 +3,6 @@ import random
 import re
 from decimal import Decimal, InvalidOperation
 from traceback import format_exc
-from urllib.error import URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
@@ -256,18 +255,6 @@ DERIVATIVE_BULK_SELECT_CONFIG = {
     "volume_financeiro_moeda": {"type": "select", "resource": "currencies", "label_key": "nome", "value_key": "nome"},
     "volume_fisico_unidade": {"type": "select", "resource": "units", "label_key": "nome", "value_key": "nome"},
 }
-
-
-def _normalize_derivative_lookup_value(value):
-    return (
-        str(value or "")
-        .strip()
-        .lower()
-        .replace(" ", "")
-        .replace("_", "")
-        .replace("-", "")
-        .replace("/", "")
-    )
 
 
 def _normalize_import_key(value):
@@ -964,59 +951,6 @@ class DerivativeOperationViewSet(TenantScopedModelViewSet):
             for uploaded_file in files
         ]
         return Response(AttachmentSerializer(created, many=True, context={"request": request}).data, status=status.HTTP_201_CREATED)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def derivative_contracts(request):
-    secao = request.GET.get("secao") or request.GET.get("seção") or request.GET.get("bolsa") or ""
-    normalized_secao = _normalize_derivative_lookup_value(secao)
-    if not normalized_secao:
-        return JsonResponse([], safe=False)
-
-    url = "https://api.sheety.co/90083751cf0794f44c9730c96a94cedf/apiCotacoesSpotGetBubble/planilha1"
-    try:
-        with urlopen(url, timeout=20) as response:
-            payload = json.load(response)
-    except (URLError, TimeoutError, ValueError):
-        return JsonResponse([], safe=False, status=502)
-
-    rows = payload.get("planilha1", []) if isinstance(payload, dict) else payload
-    options = []
-    for row in rows if isinstance(rows, list) else []:
-        normalized = {str(key).strip().lower(): value for key, value in row.items()}
-        secao_value = (
-            normalized.get("section_name")
-            or normalized.get("secao")
-            or normalized.get("seção")
-            or normalized.get("section")
-            or ""
-        )
-        if _normalize_derivative_lookup_value(secao_value) != normalized_secao:
-            continue
-
-        contract = (
-            normalized.get("ctrbolsa")
-            or normalized.get("ctr bolsa")
-            or normalized.get("ctr_bolsa")
-            or normalized.get("contratoderivativo")
-            or normalized.get("contrato derivativo")
-            or normalized.get("contrato")
-            or normalized.get("codigo")
-            or normalized.get("ticker")
-            or ""
-        )
-        if contract:
-            options.append({"value": contract, "label": contract})
-
-    deduped = []
-    seen = set()
-    for option in options:
-        if option["value"] in seen:
-            continue
-        seen.add(option["value"])
-        deduped.append(option)
-    return JsonResponse(deduped, safe=False)
 
 
 @api_view(["POST"])

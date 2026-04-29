@@ -27,7 +27,6 @@ from apps.clients.views import BrokerViewSet, ClientAccountViewSet, Counterparty
 from apps.contrato.views import ContractViewSet
 from apps.derivatives.views import (
     DerivativeOperationViewSet,
-    derivative_contracts,
     import_bubble_targets,
     import_bubble_derivatives,
     inspect_bubble_import,
@@ -131,7 +130,6 @@ urlpatterns = [
     path("api/mercado/government-bond-proxy/", government_bond_proxy, name="government_bond_proxy"),
     path("api/mercado/brazil-macro-proxy/", brazil_macro_proxy, name="brazil_macro_proxy"),
     path("api/mercado/posicao-fundos/", FundPositionSeriesView.as_view(), name="fund_position_series"),
-    path("api/derivative-contracts/", derivative_contracts, name="derivative_contracts"),
     path("api/import-tools/bubble/targets/", import_bubble_targets, name="import_bubble_targets"),
     path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),
     path("api/import-tools/bubble/derivatives/", import_bubble_derivatives, name="import_bubble_derivatives"),
