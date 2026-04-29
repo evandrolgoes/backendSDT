@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from apps.core.viewsets import TenantScopedModelViewSet
 from apps.derivatives.models import DerivativeOperation
 from apps.mercado.models import MarketNewsPost
-from apps.mercado.serializers import MarketNewsPostSerializer
+from apps.mercado.serializers import MarketNewsPostListSerializer
 from apps.physical.models import BudgetCost, CashPayment, PhysicalPayment, PhysicalQuote, PhysicalSale
 from apps.core.privacy import apply_group_privacy_scope
 from apps.strategies.models import CropBoard, HedgePolicy
@@ -585,7 +585,7 @@ def commercial_risk_summary(request):
             "netProductionVolume": net_production_volume,
         },
         "marketQuotes": TradingViewWatchlistQuoteSerializer(market_quotes_rows, many=True).data,
-        "marketNewsPosts": MarketNewsPostSerializer(market_news_rows, many=True).data,
+        "marketNewsPosts": MarketNewsPostListSerializer(market_news_rows, many=True).data,
         "upcomingMaturityRows": upcoming_rows,
         "formCompletionRows": form_completion_rows,
         "formCompletionSummary": form_completion_summary,
