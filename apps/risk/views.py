@@ -2,7 +2,7 @@ import hashlib
 import json
 
 from django.core.cache import cache
-from django.db.models import Q, Sum, Value
+from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Abs, Coalesce
 from functools import reduce
 from rest_framework.decorators import api_view, permission_classes
@@ -290,12 +290,12 @@ def commercial_risk_summary(request):
         culture_fields=("cultura",),
         season_fields=("safra",),
     )
+    _zero_decimal = Value(0, output_field=DecimalField())
     crop_boards_aggregates = crop_boards_qs.aggregate(
-        production_total=Coalesce(Sum(Abs(Coalesce("producao_total", Value(0)))), Value(0)),
-        total_area=Coalesce(Sum(Abs(Coalesce("area", Value(0)))), Value(0)),
-        row_count=Coalesce(Sum(Value(1)), Value(0)),
+        production_total=Coalesce(Sum(Abs("producao_total")), _zero_decimal),
+        total_area=Coalesce(Sum(Abs("area")), _zero_decimal),
     )
-    crop_boards_count = int(crop_boards_aggregates["row_count"] or 0)
+    crop_boards_count = crop_boards_qs.count()
     production_total = float(crop_boards_aggregates["production_total"] or 0)
     total_area = float(crop_boards_aggregates["total_area"] or 0)
 
@@ -334,10 +334,9 @@ def commercial_risk_summary(request):
         season_fields=("safra",),
     )
     physical_payments_aggregates = physical_payments_qs.aggregate(
-        volume_total=Coalesce(Sum(Abs(Coalesce("volume", Value(0)))), Value(0)),
-        row_count=Coalesce(Sum(Value(1)), Value(0)),
+        volume_total=Coalesce(Sum(Abs("volume")), _zero_decimal),
     )
-    physical_payments_count = int(physical_payments_aggregates["row_count"] or 0)
+    physical_payments_count = physical_payments_qs.count()
     physical_payment_volume = float(physical_payments_aggregates["volume_total"] or 0)
     upcoming_physical_payments = list(
         physical_payments_qs.filter(
