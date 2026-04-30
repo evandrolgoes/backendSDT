@@ -2,8 +2,7 @@ import logging
 
 from django.conf import settings
 from django.core.mail import send_mail
-from rest_framework import permissions, response, status, viewsets
-from rest_framework.views import APIView
+from rest_framework import mixins, permissions, response, status, viewsets
 
 from .models import Lead
 from .serializers import LeadSerializer
@@ -11,17 +10,22 @@ from .serializers import LeadSerializer
 logger = logging.getLogger(__name__)
 
 
-class LeadViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+class LeadViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = LeadSerializer
     queryset = Lead.objects.all()
 
+    def get_permissions(self):
+        if self.action == "create":
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
-class LeadCreateView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        serializer = LeadSerializer(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
 

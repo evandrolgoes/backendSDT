@@ -56,7 +56,7 @@ from apps.other_cash_outflows.views import OtherCashOutflowViewSet
 from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
 from apps.agenda.views import GoogleCalendarConfigViewSet
-from apps.leads.views import LeadCreateView, LeadViewSet
+from apps.leads.views import LeadViewSet
 from apps.insights.views import CommercialInsightsView, MissingFieldsIgnoredConfigView, MissingFieldsView, TableColumnConfigView
 from apps.physical.views import (
     ActualCostViewSet,
@@ -163,7 +163,6 @@ urlpatterns = [
     path("api/auth/invitations/<str:token>/", InvitationDetailByTokenView.as_view(), name="invitation_detail_by_token"),
     path("api/auth/invitations/<str:token>/accept/", InvitationAcceptView.as_view(), name="invitation_accept"),
     path("api/agenda/", include("apps.agenda.urls")),
-    path("api/leads/", LeadCreateView.as_view(), name="lead_create"),
     path("api/attachments/content/<int:attachment_id>/", attachment_content, name="attachment_content"),
     re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
 ]
