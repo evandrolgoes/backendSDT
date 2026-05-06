@@ -1,7 +1,6 @@
 from django.db import models
 
 from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
-from apps.receivables.models import EntryClient
 
 
 class Contract(TenantAwareModel, CreatedByMixin, TimeStampedModel):
@@ -10,8 +9,11 @@ class Contract(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         PENDING_FORMALIZATION = "Pendente formalizacao", "Pendente formalizacao"
         SIGNED = "Assinado", "Assinado"
 
-    cliente = models.ForeignKey(EntryClient, on_delete=models.PROTECT, related_name="contratos")
-    frequencia_pagamentos = models.CharField(max_length=120)
+    cliente = models.CharField(max_length=255)
+    cpf_cnpj = models.CharField(max_length=20, blank=True, default="")
+    endereco = models.CharField(max_length=500, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    telefone = models.CharField(max_length=30, blank=True, default="")
     status_contrato = models.CharField(max_length=30, choices=ContractStatus.choices, default=ContractStatus.PENDING_SIGNATURE)
     produto = models.CharField(max_length=255)
     valor = models.DecimalField(max_digits=18, decimal_places=2)
