@@ -61,7 +61,7 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv(), default="localhost,127.0.0.1
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
     cast=Csv(),
-    default="http://localhost:5174,https://frontend-sdt.vercel.app",
+    default="http://localhost:5174,https://frontend-sdt.vercel.app,https://hedgeposition.com.br,https://www.hedgeposition.com.br",
 )
 ALLOWED_HOSTS = normalize_hosts(ALLOWED_HOSTS)
 
@@ -226,12 +226,13 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
     cast=Csv(),
-    default="http://localhost:5174,https://frontend-sdt.vercel.app",
+    default="http://localhost:5174,https://frontend-sdt.vercel.app,https://hedgeposition.com.br,https://www.hedgeposition.com.br",
 )
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
     r"^http://127\.0\.0\.1:\d+$",
     r"^https://frontend-sdt(?:-[a-z0-9-]+)?\.vercel\.app$",
+    r"^https://(?:www\.)?hedgeposition\.com\.br$",
 ]
 CORS_ALLOWED_ORIGIN_REGEXES.extend(config("CORS_ALLOWED_ORIGIN_REGEXES_EXTRA", cast=Csv(), default=""))
 
