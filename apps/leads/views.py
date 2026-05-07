@@ -4,8 +4,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from rest_framework import mixins, permissions, response, status, viewsets
 
-from .models import Lead
-from .serializers import LeadSerializer
+from .models import HedgePositionLead, Lead
+from .serializers import HedgePositionLeadSerializer, LeadSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,62 @@ class LeadViewSet(
         except Exception as exc:
             mail_warning = "Lead salvo, mas o envio de e-mail falhou."
             logger.exception("Falha ao enviar e-mail do lead %s", lead.id, exc_info=exc)
+
+        return response.Response(
+            {"detail": "Lead cadastrado com sucesso.", "lead": serializer.data, "mail_warning": mail_warning},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class HedgePositionLeadViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = HedgePositionLeadSerializer
+    queryset = HedgePositionLead.objects.all()
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lead = serializer.save()
+
+        subject = f"Novo lead Hedge Position - {lead.nome}"
+        message = "\n".join(
+            [
+                "Um novo lead foi recebido pela landing page do Hedge Position.",
+                "",
+                f"Data: {lead.data:%d/%m/%Y %H:%M}",
+                f"Nome: {lead.nome}",
+                f"WhatsApp: {lead.whatsapp}",
+                f"E-mail: {lead.email}",
+                f"Cidade: {lead.cidade or '-'}",
+                f"Cultura principal: {lead.cultura or '-'}",
+                f"Area plantada: {lead.area or '-'}",
+                f"Mensagem: {lead.mensagem or '-'}",
+                f"Observacao: {lead.observacao or '-'}",
+                f"Origem: {lead.origem or '-'}",
+            ]
+        )
+
+        mail_warning = None
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                ["evandrogoes@agrosaldaterra.com.br"],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            mail_warning = "Lead salvo, mas o envio de e-mail falhou."
+            logger.exception("Falha ao enviar e-mail do lead Hedge Position %s", lead.id, exc_info=exc)
 
         return response.Response(
             {"detail": "Lead cadastrado com sucesso.", "lead": serializer.data, "mail_warning": mail_warning},

@@ -56,7 +56,7 @@ from apps.other_cash_outflows.views import OtherCashOutflowViewSet
 from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
 from apps.agenda.views import GoogleCalendarConfigViewSet
-from apps.leads.views import LeadViewSet
+from apps.leads.views import HedgePositionLeadViewSet, LeadViewSet
 from apps.insights.views import CommercialInsightsView, MissingFieldsIgnoredConfigView, MissingFieldsView, TableColumnConfigView
 from apps.physical.views import (
     ActualCostViewSet,
@@ -119,6 +119,7 @@ router.register("accounts-payable", AccountsPayableViewSet, basename="accounts-p
 router.register("contracts", ContractViewSet, basename="contract")
 router.register("gaming-sessions", GamingSessionViewSet, basename="gaming-session")
 router.register("leads", LeadViewSet, basename="lead")
+router.register("hedge-position-leads", HedgePositionLeadViewSet, basename="hedge-position-lead")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
