@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     "apps.physical",
     "apps.other_entries",
     "apps.other_cash_outflows",
+    "apps.cash_balances",
     "apps.receivables",
     "apps.derivatives",
     "apps.strategies",

@@ -52,6 +52,7 @@ from apps.mercado.views import (
     mercado_health,
     yahoo_finance_proxy,
 )
+from apps.cash_balances.views import CashBalanceViewSet
 from apps.other_cash_outflows.views import OtherCashOutflowViewSet
 from apps.other_entries.views import OtherEntryViewSet
 from apps.payables.views import AccountsPayableViewSet
@@ -99,6 +100,7 @@ router.register("physical-payments", PhysicalPaymentViewSet, basename="physical-
 router.register("cash-payments", CashPaymentViewSet, basename="cash-payment")
 router.register("other-cash-outflows", OtherCashOutflowViewSet, basename="other-cash-outflow")
 router.register("other-entries", OtherEntryViewSet, basename="other-entry")
+router.register("cash-balances", CashBalanceViewSet, basename="cash-balance")
 router.register("receipt-entries", ReceiptEntryViewSet, basename="receipt-entry")
 router.register("receipt-clients", EntryClientViewSet, basename="receipt-client")
 router.register("derivative-operations", DerivativeOperationViewSet, basename="derivative-operation")
