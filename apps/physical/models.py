@@ -58,6 +58,26 @@ class ActualCost(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         return f"{self.grupo_despesa} - {self.valor}"
 
 
+class Custo(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos")
+    subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos")
+    cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos")
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="custos")
+    moeda = models.CharField(max_length=20, blank=True)
+    descricao = models.CharField(max_length=255, blank=True)
+    valor_orcado = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    valor_realizado = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    data_realizado = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-data_realizado", "-created_at"]
+        verbose_name = "Custo"
+        verbose_name_plural = "Custos"
+
+    def __str__(self):
+        return f"{self.descricao or self.id} - {self.valor_orcado or 0}"
+
+
 class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     cultura = models.ForeignKey("catalog.Crop", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
     grupo = models.ForeignKey("clients.EconomicGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")

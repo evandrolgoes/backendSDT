@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.core.serializers import PrivacyScopedSerializerMixin
 
-from .models import ActualCost, BudgetCost, CashPayment, PhysicalPayment, PhysicalQuote, PhysicalSale
+from .models import ActualCost, BudgetCost, CashPayment, Custo, PhysicalPayment, PhysicalQuote, PhysicalSale
 
 
 class PhysicalQuoteSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
@@ -22,6 +22,13 @@ class BudgetCostSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerial
 class ActualCostSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = ActualCost
+        fields = "__all__"
+        read_only_fields = ["created_at", "updated_at", "created_by"]
+
+
+class CustoSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = Custo
         fields = "__all__"
         read_only_fields = ["created_at", "updated_at", "created_by"]
 

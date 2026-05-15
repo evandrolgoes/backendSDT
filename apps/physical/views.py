@@ -7,11 +7,12 @@ from apps.auditing.models import Attachment
 from apps.auditing.serializers import AttachmentSerializer
 from apps.core.viewsets import TenantScopedModelViewSet
 
-from .models import ActualCost, BudgetCost, CashPayment, PhysicalPayment, PhysicalQuote, PhysicalSale
+from .models import ActualCost, BudgetCost, CashPayment, Custo, PhysicalPayment, PhysicalQuote, PhysicalSale
 from .serializers import (
     ActualCostSerializer,
     BudgetCostSerializer,
     CashPaymentSerializer,
+    CustoSerializer,
     PhysicalPaymentSerializer,
     PhysicalQuoteSerializer,
     PhysicalSaleSerializer,
@@ -37,6 +38,13 @@ class ActualCostViewSet(TenantScopedModelViewSet):
     serializer_class = ActualCostSerializer
     filterset_fields = ["cultura", "safra", "moeda", "data_travamento"]
     search_fields = ["grupo_despesa", "obs"]
+
+
+class CustoViewSet(TenantScopedModelViewSet):
+    queryset = Custo.objects.select_related("tenant", "subgrupo", "grupo", "cultura", "safra", "created_by").all()
+    serializer_class = CustoSerializer
+    filterset_fields = ["grupo", "subgrupo", "cultura", "safra", "moeda", "data_realizado"]
+    search_fields = ["descricao"]
 
 
 class PhysicalSaleViewSet(TenantScopedModelViewSet):

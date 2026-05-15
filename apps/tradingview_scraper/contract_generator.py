@@ -16,6 +16,7 @@ Formatos de ticker (armazenados no DB, sem provider):
   - ZSK26, DOLM26  (2 dígitos no ano – compatível com contrato_derivativo nas operações)
 """
 
+import calendar
 import datetime
 
 # Código de mês padrão (CBOT / CME / B3)
@@ -26,6 +27,51 @@ MONTH_CODE = {
     7: "N", 8: "Q",  9: "U", 10: "V", 11: "X", 12: "Z",
 }
 
+# A partir deste dia o contrato do mês de entrega é considerado vencido
+# para produtos de rolagem "mid" (grãos CBOT / milho B3 — último pregão ~dia 14).
+ROLL_MID_DAY = 15
+
+# Regra de rolagem inferida pelo root do contrato, usada quando a config
+# (montada a partir do DB) não traz o campo "roll" explícito:
+#   "mid" – vence no meio do mês (today.day >= ROLL_MID_DAY)
+#   "eom" – vence no último dia útil do mês de entrega
+ROLL_BY_ROOT = {
+    "ZS": "mid", "ZW": "mid", "ZC": "mid", "ZM": "mid",
+    "ZL": "mid", "ZO": "mid", "ZR": "mid", "KE": "mid",
+    "CCM": "mid",
+    "DOL": "eom", "WDO": "eom", "BGI": "eom",
+}
+
+
+def _extract_root(symbol_fmt):
+    """'CBOT:ZS{month}{year4}' → 'ZS'."""
+    tail = str(symbol_fmt or "").split(":")[-1]
+    brace = tail.find("{")
+    return tail[:brace] if brace != -1 else tail
+
+
+def _resolve_roll(cfg):
+    """Regra de rolagem: cfg['roll'] explícito tem prioridade; caso contrário
+    infere pelo root do símbolo (cobre a config montada a partir do DB)."""
+    return cfg.get("roll") or ROLL_BY_ROOT.get(_extract_root(cfg.get("symbol_fmt", "")))
+
+
+def _last_business_day(year, month):
+    last_day = calendar.monthrange(year, month)[1]
+    day = datetime.date(year, month, last_day)
+    while day.weekday() >= 5:  # 5 = sábado, 6 = domingo
+        day -= datetime.timedelta(days=1)
+    return day
+
+
+def _current_month_expired(roll, today):
+    """True se o contrato do mês corrente de entrega já venceu."""
+    if roll == "mid":
+        return today.day >= ROLL_MID_DAY
+    if roll == "eom":
+        return today > _last_business_day(today.year, today.month)
+    return False
+
 # Cada entrada define:
 #   symbol_fmt  – formato do símbolo TradingView (usa {year4} = 4 dígitos)
 #                 ex: "BMFBOVESPA:DOL{month}{year4}"
@@ -35,6 +81,10 @@ MONTH_CODE = {
 #                 None = símbolo fixo (sem vencimento, ex: spot)
 #   n           – quantos vencimentos futuros manter simultaneamente
 #   section     – nome da seção para exibição / filtragem
+#   roll        – regra de rolagem do mês de entrega (opcional):
+#                 "mid" = vence ~meio do mês (dia >= ROLL_MID_DAY)
+#                 "eom" = vence no último dia útil do mês
+#                 ausente = inferido pelo root via ROLL_BY_ROOT
 CONTRACTS_CONFIG = [
     # ── DOLAR FWD — nome deve bater com Exchange.nome no banco ───────────────
     {
@@ -43,6 +93,7 @@ CONTRACTS_CONFIG = [
         "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         "n": 60,
         "section": "DOLAR FWD",
+        "roll": "eom",
     },
     {
         "symbol_fmt": "BMFBOVESPA:WDO{month}{year4}",
@@ -50,6 +101,7 @@ CONTRACTS_CONFIG = [
         "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         "n": 60,
         "section": "DOLAR FWD",
+        "roll": "eom",
     },
     # ── MILHO B3 ─────────────────────────────────────────────────────────────
     {
@@ -58,6 +110,7 @@ CONTRACTS_CONFIG = [
         "months": [3, 5, 7, 9, 11],
         "n": 6,
         "section": "MILHO B3",
+        "roll": "mid",
     },
     # ── SOJA CBOT ────────────────────────────────────────────────────────────
     {
@@ -66,6 +119,7 @@ CONTRACTS_CONFIG = [
         "months": [1, 3, 5, 7, 8, 9, 11],
         "n": 6,
         "section": "SOJA CBOT",
+        "roll": "mid",
     },
     # ── TRIGO CBOT ───────────────────────────────────────────────────────────
     {
@@ -74,6 +128,7 @@ CONTRACTS_CONFIG = [
         "months": [3, 5, 7, 9, 12],
         "n": 6,
         "section": "TRIGO CBOT",
+        "roll": "mid",
     },
     # ── Extras (MTM / cotações) — sem bolsa vinculada ────────────────────────
     {
@@ -82,6 +137,7 @@ CONTRACTS_CONFIG = [
         "months": [2, 4, 6, 8, 10, 12],
         "n": 4,
         "section": "Extras",
+        "roll": "eom",
     },
     {
         "symbol_fmt": "CBOT:ZC{month}{year4}",   # Milho CBOT
@@ -89,6 +145,7 @@ CONTRACTS_CONFIG = [
         "months": [3, 5, 7, 9, 12],
         "n": 4,
         "section": "Extras",
+        "roll": "mid",
     },
     # ── Câmbio Spot ──────────────────────────────────────────────────────────
     {
@@ -140,6 +197,7 @@ def generate_active_symbols(contracts_config=None, reference_date=None):
             sort_order += 1
             continue
 
+        roll = _resolve_roll(cfg)
         year = today.year
         month = today.month
         found = 0
@@ -147,7 +205,9 @@ def generate_active_symbols(contracts_config=None, reference_date=None):
 
         while found < cfg["n"] and iterations < 120:
             iterations += 1
-            if month in cfg["months"]:
+            is_current_month = year == today.year and month == today.month
+            expired = is_current_month and _current_month_expired(roll, today)
+            if month in cfg["months"] and not expired:
                 m_code = MONTH_CODE[month]
                 y2 = str(year)[-2:]
                 y4 = str(year)

@@ -63,6 +63,7 @@ from apps.physical.views import (
     ActualCostViewSet,
     BudgetCostViewSet,
     CashPaymentViewSet,
+    CustoViewSet,
     PhysicalPaymentViewSet,
     PhysicalQuoteViewSet,
     PhysicalSaleViewSet,
@@ -95,6 +96,7 @@ router.register("price-sources", PriceSourceViewSet, basename="price-source")
 router.register("physical-quotes", PhysicalQuoteViewSet, basename="physical-quote")
 router.register("budget-costs", BudgetCostViewSet, basename="budget-cost")
 router.register("actual-costs", ActualCostViewSet, basename="actual-cost")
+router.register("custos", CustoViewSet, basename="custo")
 router.register("physical-sales", PhysicalSaleViewSet, basename="physical-sale")
 router.register("physical-payments", PhysicalPaymentViewSet, basename="physical-payment")
 router.register("cash-payments", CashPaymentViewSet, basename="cash-payment")
