@@ -23,6 +23,7 @@ from apps.accounts.views import (
 )
 from apps.auditing.views import AttachmentViewSet, AuditLogViewSet, attachment_content
 from apps.catalog.views import CropViewSet, CurrencyViewSet, DerivativeOperationNameViewSet, ExchangeViewSet, MarketInstrumentViewSet, PriceSourceViewSet, PriceUnitViewSet, UnitViewSet
+from apps.cattle.views import ConfinementDietViewSet, ConfinementLotViewSet
 from apps.clients.views import BrokerViewSet, ClientAccountViewSet, CounterpartyViewSet, CropSeasonViewSet, EconomicGroupViewSet, SubGroupViewSet
 from apps.contrato.views import ContractViewSet
 from apps.derivatives.views import (
@@ -110,6 +111,8 @@ router.register("strategies", StrategyViewSet, basename="strategy")
 router.register("strategy-triggers", StrategyTriggerViewSet, basename="strategy-trigger")
 router.register("hedge-policies", HedgePolicyViewSet, basename="hedge-policy")
 router.register("crop-boards", CropBoardViewSet, basename="crop-board")
+router.register("confinement-diets", ConfinementDietViewSet, basename="confinement-diet")
+router.register("confinement-lots", ConfinementLotViewSet, basename="confinement-lot")
 router.register("market-prices", MarketPriceViewSet, basename="market-price")
 router.register("fx-rates", FxRateViewSet, basename="fx-rate")
 router.register("basis-series", BasisSeriesViewSet, basename="basis-series")

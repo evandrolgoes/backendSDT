@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.clients",
     "apps.catalog",
+    "apps.cattle",
     "apps.physical",
     "apps.other_entries",
     "apps.other_cash_outflows",
