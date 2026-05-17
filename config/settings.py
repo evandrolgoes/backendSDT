@@ -249,6 +249,14 @@ AGRINVEST_USERNAME = config("AGRINVEST_USERNAME", default="")
 AGRINVEST_PASSWORD = config("AGRINVEST_PASSWORD", default="")
 AGRINVEST_CLIENT_ID = config("AGRINVEST_CLIENT_ID", default="D2365402-2F59-4627-A73D-71814F8FCCD2")
 AGRINVEST_NEWS_URL = config("AGRINVEST_NEWS_URL", default="https://go.agrinvest.agr.br/noticias")
+
+# Cobertura forward das fábricas (provider-agnóstico). Sem credencial → o
+# coletor grava o provedor como "não configurado" e o dashboard mostra um
+# placeholder orientando a conectar. Não inventa dado.
+SAFRAS_DATAFEED_URL = config("SAFRAS_DATAFEED_URL", default="")  # endpoint do SAFRAS Data Feed (soja, comercialização/cobertura)
+SAFRAS_DATAFEED_TOKEN = config("SAFRAS_DATAFEED_TOKEN", default="")
+KPLER_API_URL = config("KPLER_API_URL", default="https://api.kpler.com")  # Kpler Grains & Oilseeds Flows
+KPLER_API_TOKEN = config("KPLER_API_TOKEN", default="")
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", cast=int, default=25)

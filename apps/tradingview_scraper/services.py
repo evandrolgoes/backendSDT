@@ -405,51 +405,39 @@ def fetch_continuous_contract_price(exchange, date_str):
     return _fetch_scanner_price_for_continuous(exchange.tv_symbol_fmt)
 
 
-def fetch_dollar_forward_price(payment_date_str, trade_date_str):
-    """Dólar futuro (DOL) de referência para uma venda física.
+def fetch_dollar_future_quote(payment_date_str, trade_date_str):
+    """Cotação do contrato DOL futuro de referência para o cálculo do basis.
 
-    Contrato escolhido = DOL do mês/ano da data de pagamento (vence ~dia 1
-    daquele mês, antes do dia do pagamento). Ex.: pagamento 30/09/2026 →
-    DOLU26 (vencimento 01/09/2026).
+    Contrato = DOL do mês/ano da data de pagamento (vencimento ~dia 1,
+    anterior ao dia do pagamento). Ex.: pagamento 30/09/2027 → DOLU27.
 
-    Preço = cotação do contrato DOL futuro (NÃO é o dólar spot):
+    Preço (NÃO é o dólar spot):
       1. scanner TradingView ao vivo (preço limpo do contrato ÷ 1000);
-      2. fallback: preço bruto do último snapshot sincronizado da
-         watchlist, normalizado do mesmo jeito (mantém o mesmo valor —
-         sem o ajuste intradiário de USDBRL que o sync grava em `price`).
+      2. fallback: preço bruto do último snapshot da watchlist, normalizado igual.
 
-    Não há histórico gratuito do DOL B3 por vencimento, então para
-    boletagens retroativas a cotação é a do contrato hoje — o campo segue
-    editável para ajuste manual com o forward exato negociado.
+    Não há histórico gratuito do DOL B3 por vencimento — para datas
+    retroativas a cotação é a do contrato hoje (aproximação).
 
-    Args:
-        payment_date_str: data de pagamento "YYYY-MM-DD" (define o vencimento).
-        trade_date_str: data de negociação "YYYY-MM-DD" (apenas validada).
-
-    Returns:
-        dict {price: str|None, contract: str|None, source: "scanner"|"watchlist"|None}
+    Retorna Decimal ou None. `trade_date_str` é apenas validado (a chave de
+    cache por data de negociação fica a cargo da camada de cache).
     """
     try:
         payment_dt = datetime.strptime(payment_date_str, "%Y-%m-%d")
         datetime.strptime(trade_date_str, "%Y-%m-%d")
     except (ValueError, TypeError):
-        return {"price": None, "contract": None, "source": None}
+        return None
 
     m_code = MONTH_CODE[payment_dt.month]
     y4 = str(payment_dt.year)
     contract_ticker = f"DOL{m_code}{y4[-2:]}"
     contract_symbol = f"BMFBOVESPA:DOL{m_code}{y4}"
 
-    # 1) Cotação ao vivo do contrato DOL futuro (scanner TradingView).
     quotes = _fetch_quotes_for_symbols([contract_symbol])
     raw_price = (quotes.get(contract_symbol) or {}).get("price")
     price = _normalize_price_for_ticker(contract_symbol, contract_ticker, raw_price)
     if price is not None:
-        return {"price": str(price), "contract": contract_ticker, "source": "scanner"}
+        return price
 
-    # 2) Fallback: preço bruto do último snapshot sincronizado da watchlist,
-    #    normalizado igual ao item 1 (mesmo valor do scanner, sem o ajuste
-    #    de USDBRL que o sync aplica no campo `price`).
     snapshot = (
         TradingViewWatchlistQuote.objects.filter(symbol=contract_symbol)
         .order_by("-synced_at")
@@ -457,10 +445,7 @@ def fetch_dollar_forward_price(payment_date_str, trade_date_str):
     )
     if snapshot is not None:
         raw_snapshot = (snapshot.raw_data or {}).get("price")
-        price = _normalize_price_for_ticker(
+        return _normalize_price_for_ticker(
             contract_symbol, contract_ticker, _to_decimal(raw_snapshot)
         )
-        if price is not None:
-            return {"price": str(price), "contract": contract_ticker, "source": "watchlist"}
-
-    return {"price": None, "contract": contract_ticker, "source": None}
+    return None

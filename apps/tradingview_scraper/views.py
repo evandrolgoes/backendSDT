@@ -8,7 +8,6 @@ from .models import TradingViewWatchlistQuote
 from .serializers import TradingViewWatchlistQuoteSerializer
 from .services import (
     fetch_continuous_contract_price,
-    fetch_dollar_forward_price,
     sync_auto_contracts,
     trigger_contracts_refresh_async,
 )
@@ -56,17 +55,6 @@ class TradingViewWatchlistQuoteViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"price": None})
         price = fetch_continuous_contract_price(exchange, date_str)
         return Response({"price": str(price) if price is not None else None})
-
-    @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="dollar-forward")
-    def dollar_forward(self, request):
-        payment_date = request.query_params.get("payment_date", "").strip()
-        trade_date = request.query_params.get("trade_date", "").strip()
-        if not payment_date or not trade_date:
-            return Response(
-                {"error": "payment_date e trade_date são obrigatórios"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response(fetch_dollar_forward_price(payment_date, trade_date))
 
     @action(detail=False, methods=["post"])
     def sync(self, request):

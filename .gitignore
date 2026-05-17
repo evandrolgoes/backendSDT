@@ -12,3 +12,6 @@ staticfiles/
 .pytest_cache/
 .mypy_cache/
 .DS_Store
+
+# Dumps de banco (grandes, nunca versionar)
+backups/*.sqlite3*

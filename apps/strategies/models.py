@@ -47,6 +47,15 @@ class StrategyTrigger(models.Model):
     obs = models.TextField(blank=True)
     status = models.CharField(max_length=50, blank=True)
 
+    # Estado do alerta de "atingido" (avaliado no servidor a cada ~60s).
+    # "armed"   = pronto para disparar quando o preço cruzar o strike.
+    # "alerted" = já avisou neste atingimento; só re-arma se sair do alvo.
+    ALERT_STATE_ARMED = "armed"
+    ALERT_STATE_ALERTED = "alerted"
+    alert_state = models.CharField(max_length=20, default=ALERT_STATE_ARMED)
+    alerted_at = models.DateTimeField(null=True, blank=True)
+    alert_price = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+
     class Meta:
         ordering = ["-id"]
 
@@ -141,3 +150,26 @@ class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         else:
             self.producao_total = None
         super().save(*args, **kwargs)
+
+
+class TriggerAlertLog(models.Model):
+    """Auditoria de cada e-mail de gatilho atingido disparado pelo servidor."""
+
+    trigger = models.ForeignKey(
+        StrategyTrigger, on_delete=models.CASCADE, related_name="alert_logs"
+    )
+    contract = models.CharField(max_length=120, blank=True)
+    direction = models.CharField(max_length=20, blank=True)
+    strike = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    price = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    recipients = models.JSONField(default=list, blank=True)
+    email_sent = models.BooleanField(default=False)
+    detail = models.CharField(max_length=255, blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
+        indexes = [models.Index(fields=["trigger", "-sent_at"])]
+
+    def __str__(self):
+        return f"Alerta {self.contract} @ {self.price} ({self.sent_at:%Y-%m-%d %H:%M})"

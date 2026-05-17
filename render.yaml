@@ -7,3 +7,67 @@ services:
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --worker-class gthread --threads 4 --timeout 120 --max-requests 500 --max-requests-jitter 50
     healthCheckPath: /api/health/
+    # SMTP (Google Workspace) — usado pelo alerta de gatilho atingido, que
+    # roda no loop de 60s deste processo web. Demais vars (DATABASE_URL etc.)
+    # continuam gerenciadas no painel da Render.
+    # EMAIL_HOST_PASSWORD = App Password de 16 dígitos (NÃO a senha normal):
+    # Conta Google -> Segurança -> Verificação em 2 etapas (ativar) ->
+    # Senhas de app -> gerar p/ "Mail". Cole no painel da Render (sync:false).
+    envVars:
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "true"
+      - key: EMAIL_USE_SSL
+        value: "false"
+      - key: EMAIL_HOST_USER
+        value: evandrogoes@agrosaldaterra.com.br
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        value: HedgePosition <evandrogoes@agrosaldaterra.com.br>
+
+  # Coletor do dataset sazonal de basis (CONAB + CBOT + PTAX). Roda 1x/dia:
+  # quando a CONAB carrega novas semanas (incl. virada de ano), o snapshot
+  # mais recente passa a servi-las sem rebuild do front. Idempotente.
+  # Atenção: no painel da Render, anexe a este cron o MESMO grupo de env
+  # vars (DATABASE_URL etc.) do serviço web sdt-backend.
+  - type: cron
+    name: sdt-conab-basis-collector
+    env: python
+    plan: starter
+    rootDir: backend
+    schedule: "0 9 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py collect_conab_basis
+
+  # Coletor de esmagamento/cobertura das fábricas de soja (USDA PSD +
+  # capacidade ABIOVE). Roda 1x/dia: quando o USDA divulga novo ano-safra
+  # (circular Oilseeds), o snapshot mais recente passa a servi-lo sem
+  # rebuild do front. Idempotente. Mesma observação de env vars do cron
+  # acima (anexe o MESMO grupo de env do sdt-backend no painel da Render).
+  - type: cron
+    name: sdt-soja-crush-collector
+    env: python
+    plan: starter
+    rootDir: backend
+    schedule: "30 9 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py collect_soja_crush
+
+  # Coletor de cobertura forward das fábricas (SAFRAS p/ Brasil, Kpler p/
+  # China). Roda 1x/dia. Sem credencial configurada, grava o provedor como
+  # "não configurado" (não falha). Mesma observação de env vars dos crons
+  # acima + SAFRAS_DATAFEED_*/KPLER_API_* quando contratar.
+  - type: cron
+    name: sdt-forward-coverage-collector
+    env: python
+    plan: starter
+    rootDir: backend
+    schedule: "45 9 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py collect_forward_coverage

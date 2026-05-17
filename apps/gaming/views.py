@@ -15,3 +15,12 @@ class GamingSessionViewSet(ModelViewSet):
     filterset_fields = ["game_code", "kind"]
     ordering_fields = ["final_price", "ts", "created_at"]
     ordering = ["-final_price"]
+
+    def get_queryset(self):
+        # Sessoes de usuario teste nunca entram no ranking/lista.
+        return super().get_queryset().exclude(is_test=True)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        is_test = bool(getattr(user, "is_authenticated", False) and user.is_test_account())
+        serializer.save(is_test=is_test)

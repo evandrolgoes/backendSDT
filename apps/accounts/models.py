@@ -30,6 +30,10 @@ class Tenant(TimeStampedModel):
     name = models.CharField(max_length=150)
     slug = models.SlugField(unique=True)
     is_active = models.BooleanField(default=True)
+    is_test = models.BooleanField(
+        default=False,
+        help_text="Tenant de testes: dados isolados, fora de qualquer carteira/relatorio/ranking.",
+    )
     account_type = models.CharField(max_length=30, choices=AccountType.choices, default=AccountType.SHARED_CLIENT)
     parent_distributor = models.ForeignKey(
         "self",
@@ -165,16 +169,23 @@ class User(AbstractUser):
             return True
         return bool(self.tenant_id and self.tenant.slug in set(slugs))
 
+    def is_test_account(self):
+        return bool(self.tenant_id and self.tenant.is_test)
+
     def get_master_root(self):
         return self.master_user or self
 
     def get_master_cohort(self):
         root = self.get_master_root()
-        return User.objects.filter(models.Q(id=root.id) | models.Q(master_user=root))
+        return User.objects.filter(models.Q(id=root.id) | models.Q(master_user=root)).exclude(tenant__is_test=True)
 
     def get_internal_team_cohort(self):
         root = self.get_master_root()
-        return User.objects.filter(models.Q(id=root.id) | models.Q(master_user=root)).exclude(tenant__slug="usuario")
+        return (
+            User.objects.filter(models.Q(id=root.id) | models.Q(master_user=root))
+            .exclude(tenant__slug="usuario")
+            .exclude(tenant__is_test=True)
+        )
 
     def get_active_admin_invitation_count(self):
         return self.sent_invitations.filter(status=Invitation.Status.PENDING).count()
@@ -209,6 +220,10 @@ class Invitation(TimeStampedModel):
     access_status = models.CharField(max_length=20, choices=User.AccessStatus.choices, default=User.AccessStatus.ACTIVE)
     max_admin_invitations = models.PositiveIntegerField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    is_test = models.BooleanField(
+        default=False,
+        help_text="Convite de usuario teste: a conta cai no tenant 'teste', sem carteira.",
+    )
     message = models.TextField(blank=True)
     expires_at = models.DateField(null=True, blank=True)
     scope_access_level = models.CharField(max_length=20, choices=User.ScopeAccessLevel.choices, default=User.ScopeAccessLevel.READ)

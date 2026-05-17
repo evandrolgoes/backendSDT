@@ -16,6 +16,7 @@ AVAILABLE_MODULES = [
     ("market_basis", "Mercado: Basis"),
     ("market_fund_positions", "Mercado: Posicao de Fundos"),
     ("market_interest_rates", "Mercado: Taxa de Juros"),
+    ("market_indicators", "Mercado: Indicadores Brasil"),
     ("market_others", "Mercado: Outros"),
     ("cad_groups", "Cadastro: Grupos"),
     ("cad_subgroups", "Cadastro: Subgrupos"),

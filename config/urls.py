@@ -31,7 +31,7 @@ from apps.derivatives.views import (
     import_bubble_derivatives,
     inspect_bubble_import,
 )
-from apps.marketdata.views import BasisSeriesViewSet, FxRateViewSet, MarketPriceViewSet
+from apps.marketdata.views import BasisSeriesViewSet, ConabBasisDatasetView, ForwardCoverageDatasetView, FxRateViewSet, MarketPriceViewSet, SojaCrushDatasetView
 from apps.mass_update.views import (
     MassImportApplyView,
     MassImportMetadataView,
@@ -135,6 +135,9 @@ urlpatterns = [
     path("api/mercado/government-bond-proxy/", government_bond_proxy, name="government_bond_proxy"),
     path("api/mercado/brazil-macro-proxy/", brazil_macro_proxy, name="brazil_macro_proxy"),
     path("api/mercado/posicao-fundos/", FundPositionSeriesView.as_view(), name="fund_position_series"),
+    path("api/marketdata/conab-basis/", ConabBasisDatasetView.as_view(), name="conab_basis_dataset"),
+    path("api/marketdata/soja-crush/", SojaCrushDatasetView.as_view(), name="soja_crush_dataset"),
+    path("api/marketdata/forward-coverage/", ForwardCoverageDatasetView.as_view(), name="forward_coverage_dataset"),
     path("api/import-tools/bubble/targets/", import_bubble_targets, name="import_bubble_targets"),
     path("api/import-tools/bubble/inspect/", inspect_bubble_import, name="inspect_bubble_import"),
     path("api/import-tools/bubble/derivatives/", import_bubble_derivatives, name="import_bubble_derivatives"),

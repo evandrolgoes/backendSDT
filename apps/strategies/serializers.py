@@ -73,6 +73,8 @@ class StrategyTriggerSerializer(PrivacyScopedSerializerMixin, serializers.ModelS
     class Meta:
         model = StrategyTrigger
         fields = "__all__"
+        # Estado do alerta é gerido só pelo servidor (evaluate_trigger_alerts).
+        read_only_fields = ["alert_state", "alerted_at", "alert_price"]
 
 
 class HedgePolicySerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):

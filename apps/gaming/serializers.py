@@ -28,7 +28,8 @@ class GamingSessionSerializer(serializers.ModelSerializer):
             "h_m3",
             "h_m4",
             "h_m5",
+            "is_test",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "is_test", "created_at", "updated_at"]

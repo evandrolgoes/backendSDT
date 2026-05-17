@@ -140,7 +140,14 @@ class UserViewSet(TenantScopedModelViewSet):
     ordering_fields = ["username", "created_at"]
 
     def get_queryset(self):
-        return self.queryset
+        queryset = self.queryset
+        user = getattr(self.request, "user", None)
+        include_test = str(self.request.query_params.get("include_test", "")).lower() in {"1", "true", "yes"}
+        # Usuarios teste ficam ocultos da lista. Superuser pode trazer com
+        # ?include_test=1 (necessario para administra-los).
+        if not (include_test and getattr(user, "is_superuser", False)):
+            queryset = queryset.exclude(tenant__is_test=True)
+        return queryset
 
 class ImpersonateUserView(APIView):
     permission_classes = [IsMasterAdminOrTenantManager]

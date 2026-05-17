@@ -44,6 +44,15 @@ def _sync_loop():
         except Exception:
             # Keep the backend running even if an external sync fails.
             pass
+        try:
+            # Avalia gatilhos atingidos com as cotações recém-sincronizadas.
+            # Import tardio: evita import circular no boot do app.
+            from apps.strategies.alerts import evaluate_trigger_alerts
+
+            evaluate_trigger_alerts()
+        except Exception:
+            # Um erro no alerta não pode derrubar o sync de cotação.
+            pass
         time.sleep(SYNC_INTERVAL_SECONDS)
 
 

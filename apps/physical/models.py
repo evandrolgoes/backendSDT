@@ -68,6 +68,7 @@ class Custo(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     valor_orcado = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     valor_realizado = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     data_realizado = models.DateField(null=True, blank=True)
+    obs = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-data_realizado", "-created_at"]
@@ -84,19 +85,14 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     subgrupo = models.ForeignKey("clients.SubGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
     localidade = models.CharField(max_length=120, blank=True)
-    basis_valor = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    basis_moeda = models.CharField(max_length=30, blank=True)
-    bolsa_ref = models.CharField(max_length=50, blank=True)
     contrato_bolsa = models.CharField(max_length=50, blank=True)
     cif_fob = models.CharField(max_length=20, blank=True)
     compra_venda = models.CharField(max_length=20, blank=True)
     contraparte = models.ForeignKey("clients.Counterparty", null=True, blank=True, on_delete=models.SET_NULL, related_name="vendas_fisico")
-    cotacao_bolsa_ref = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     cultura_produto = models.CharField(max_length=100, blank=True)
     data_entrega = models.DateField(null=True, blank=True)
     data_negociacao = models.DateField(null=True, blank=True)
     data_pagamento = models.DateField(null=True, blank=True)
-    dolar_de_venda = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
     faturamento_total_contrato = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     moeda_contrato = models.CharField(max_length=20, blank=True)
     moeda_unidade = models.CharField(max_length=30, blank=True)

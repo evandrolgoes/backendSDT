@@ -14,6 +14,7 @@ class GamingSession(TimeStampedModel):
     player_name = models.CharField(max_length=200, blank=True)
     seed = models.BigIntegerField(null=True, blank=True)
     ts = models.BigIntegerField(default=0)  # JS epoch ms for ordering compatibility
+    is_test = models.BooleanField(default=False, db_index=True)  # sessao de usuario teste: fora do ranking
 
     # Config fields (kind=CONFIG)
     cost_rsc = models.FloatField(null=True, blank=True)

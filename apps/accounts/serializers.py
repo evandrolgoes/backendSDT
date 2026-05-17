@@ -40,7 +40,11 @@ def _tenant_requires_master_user(tenant):
 
 
 def _get_available_master_user_queryset(actor):
-    queryset = User.objects.filter(master_user__isnull=True, tenant_id__isnull=False).exclude(tenant__slug="usuario")
+    queryset = (
+        User.objects.filter(master_user__isnull=True, tenant_id__isnull=False)
+        .exclude(tenant__slug="usuario")
+        .exclude(tenant__is_test=True)
+    )
     if not actor or not getattr(actor, "is_authenticated", False):
         return queryset.none()
     if actor.is_superuser or actor.has_tenant_slug("admin"):
@@ -367,6 +371,7 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "status",
+            "is_test",
             "expires_at",
             "invited_by",
             "invited_by_name",
@@ -438,8 +443,20 @@ class BaseInvitationSerializer(serializers.ModelSerializer):
             active_statuses = [Invitation.Status.PENDING]
             if duplicate_invite.filter(status__in=active_statuses, kind=invitation_kind).exists():
                 raise serializers.ValidationError({"email": "Ja existe um convite ativo para este e-mail neste tenant."})
+        is_test_invite = attrs.get("is_test")
+        if is_test_invite is None and self.instance is not None:
+            is_test_invite = getattr(self.instance, "is_test", False)
+        is_test_invite = bool(is_test_invite)
+        attrs["is_test"] = is_test_invite
         if invitation_kind == Invitation.Kind.PLATFORM_ADMIN:
-            if request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
+            if is_test_invite:
+                # Convite teste sempre cai no tenant "teste", sem carteira,
+                # independente de quem convida ou do tenant escolhido.
+                attrs["target_tenant_slug"] = "teste"
+                attrs["target_tenant_name"] = Tenant.objects.filter(slug="teste").values_list("name", flat=True).first() or "Teste"
+                target_tenant_slug = "teste"
+                attrs["master_user"] = None
+            elif request_user and getattr(request_user, "is_authenticated", False) and not request_user.is_superuser:
                 requester_tenant_slug = getattr(getattr(request_user, "tenant", None), "slug", "")
                 if requester_tenant_slug != "admin":
                     attrs["target_tenant_slug"] = "usuario"
@@ -579,6 +596,11 @@ class InvitationAcceptSerializer(serializers.Serializer):
             target_tenant = Tenant.objects.get(slug=invitation.target_tenant_slug)
             if target_tenant.slug == "usuario":
                 master_user = invitation.master_user or invitation.invited_by
+                role = User.Role.STAFF
+            elif target_tenant.is_test:
+                # Usuario teste: experiencia normal do produtor (STAFF, isolado
+                # por privacidade de grupo), porem sem carteira vinculada.
+                master_user = None
                 role = User.Role.STAFF
             else:
                 master_user = None

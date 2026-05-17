@@ -100,9 +100,24 @@ WGB_DURATION_ALIASES = {
     "10Y": {"label": "10 Years", "months": 120},
 }
 
+# Símbolo → série do BCB SGS (https://www3.bcb.gov.br/sgspub). Diárias (1, 432)
+# o SGS limita a 10 anos por requisição; mensais não têm esse teto.
+BRAZIL_MACRO_SGS_SERIES = {
+    "BRINTR": 432,     # Meta Selic definida pelo Copom (% a.a.)
+    "SELIC": 432,
+    "IPCA12M": 13522,  # IPCA acumulado em 12 meses (% a.a.)
+    "IPCAMOM": 433,    # IPCA - variação mensal (% no mês)
+    "USDBRL": 1,       # Dólar americano (venda) - PTAX (R$)
+    "PTAX": 1,
+    "TRADEBAL": 22707,  # Balança comercial - saldo - mensal (US$ milhões)
+}
+
+# Resolvidos via API de indicadores do IBGE (não pelo SGS).
+BRAZIL_MACRO_IBGE_SYMBOLS = {"BRGDPYY"}
+
 BRAZIL_MACRO_SYMBOL_ALIASES = {
-    "BRINTR": "BRINTR",
-    "BRGDPYY": "BRGDPYY",
+    **{symbol: symbol for symbol in BRAZIL_MACRO_SGS_SERIES},
+    **{symbol: symbol for symbol in BRAZIL_MACRO_IBGE_SYMBOLS},
 }
 
 # ── Futures contract validation ──────────────────────────────────────────────
@@ -187,6 +202,38 @@ def _quarter_code_to_iso_date(quarter_code):
     if quarter == 4:
         return f"{code[:4]}-12-31"
     raise ValueError("Invalid quarter code")
+
+
+def _fetch_bcb_sgs_series(series_id, start_date, end_date, default_years=10):
+    """Série temporal do BCB SGS como lista de {date (ISO), value (float)}.
+
+    `start_date`/`end_date` são ISO (YYYY-MM-DD) ou vazios; quando vazios usa
+    os últimos `default_years` anos até hoje.
+    """
+    today = timezone.now().date()
+    normalized_start = start_date or (today - timedelta(days=365 * default_years)).isoformat()
+    normalized_end = end_date or today.isoformat()
+    url = (
+        f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series_id}/dados"
+        f"?formato=json&dataInicial={urllib.parse.quote(_iso_to_brazil_date(normalized_start))}"
+        f"&dataFinal={urllib.parse.quote(_iso_to_brazil_date(normalized_end))}"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    rows = []
+    for item in payload:
+        iso_date = _brazil_to_iso_date(item.get("data"))
+        value = item.get("valor")
+        if not iso_date or value in (None, ""):
+            continue
+        try:
+            numeric_value = float(str(value).replace(",", "."))
+        except (TypeError, ValueError):
+            continue
+        rows.append({"date": iso_date, "value": numeric_value})
+    return rows
 
 
 def yahoo_finance_proxy(request):
@@ -349,33 +396,12 @@ def brazil_macro_proxy(request):
         return JsonResponse({"error": "Symbol not allowed"}, status=400)
 
     try:
-        if symbol == "BRINTR":
-            today = timezone.now().date()
-            default_start = today - timedelta(days=365 * 10)
-            normalized_start = start_date or default_start.isoformat()
-            normalized_end = end_date or today.isoformat()
-            url = (
-                "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados"
-                f"?formato=json&dataInicial={urllib.parse.quote(_iso_to_brazil_date(normalized_start))}"
-                f"&dataFinal={urllib.parse.quote(_iso_to_brazil_date(normalized_end))}"
+        if symbol in BRAZIL_MACRO_SGS_SERIES:
+            series_id = BRAZIL_MACRO_SGS_SERIES[symbol]
+            rows = _fetch_bcb_sgs_series(series_id, start_date, end_date)
+            return JsonResponse(
+                {"symbol": symbol, "source": f"bcb_sgs_{series_id}", "rows": rows}
             )
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=20) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-
-            rows = []
-            for item in payload:
-                date = _brazil_to_iso_date(item.get("data"))
-                value = item.get("valor")
-                if not date or value in (None, ""):
-                    continue
-                try:
-                    numeric_value = float(str(value).replace(",", "."))
-                except (TypeError, ValueError):
-                    continue
-                rows.append({"date": date, "value": numeric_value})
-
-            return JsonResponse({"symbol": symbol, "source": "bcb_sgs_432", "rows": rows})
 
         req = urllib.request.Request(
             "https://servicodados.ibge.gov.br/api/v1/portal/indicadores?periodo=-40",
