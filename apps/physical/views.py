@@ -1,14 +1,10 @@
-from collections import defaultdict
 from datetime import date
-from decimal import Decimal
 
 from django.contrib.contenttypes.models import ContentType
-from django.db import transaction
 from rest_framework import parsers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.auditing.context import suppress_audit_signals
 from apps.auditing.models import Attachment
 from apps.auditing.serializers import AttachmentSerializer
 from apps.catalog.models import Exchange
@@ -53,103 +49,6 @@ class CustoViewSet(TenantScopedModelViewSet):
     serializer_class = CustoSerializer
     filterset_fields = ["grupo", "subgrupo", "cultura", "safra", "moeda", "data_realizado"]
     search_fields = ["descricao"]
-
-    @action(detail=False, methods=["post"], url_path="importar-legado")
-    def importar_legado(self, request):
-        """Migração ÚNICA E PROVISÓRIA: copia BudgetCost (orçado) + ActualCost
-        (realizado) para Custo, mesclando por chave.
-
-        - Escopo: TODAS as carteiras (restrito a superuser).
-        - Chave de mescla: tenant + grupo + subgrupo + cultura + safra + moeda
-          + grupo_despesa (vira `descricao`). Linhas com a mesma chave somam
-          `valor`; `data_realizado` = maior `data_travamento`; `obs` concatena.
-        - Idempotente: re-rodar atualiza as mesmas linhas (não duplica). NÃO
-          apaga BudgetCost/ActualCost — a remoção é feita depois, validada.
-        - `considerar_na_politica_de_hedge` é descartado (não existe em Custo).
-        """
-        if not request.user.is_superuser:
-            return Response(
-                {"error": "Apenas superuser pode rodar a migração de custos legados."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        def _norm(value):
-            return (value or "").strip()
-
-        budget_agg = defaultdict(lambda: {"valor": Decimal("0"), "obs": []})
-        for b in BudgetCost.objects.all().iterator():
-            key = (b.tenant_id, b.grupo_id, b.subgrupo_id, b.cultura_id, b.safra_id, _norm(b.moeda), _norm(b.grupo_despesa))
-            agg = budget_agg[key]
-            if b.valor is not None:
-                agg["valor"] += b.valor
-            if _norm(b.obs):
-                agg["obs"].append(b.obs.strip())
-
-        actual_agg = defaultdict(lambda: {"valor": Decimal("0"), "data": None, "obs": []})
-        for a in ActualCost.objects.all().iterator():
-            key = (a.tenant_id, a.grupo_id, a.subgrupo_id, a.cultura_id, a.safra_id, _norm(a.moeda), _norm(a.grupo_despesa))
-            agg = actual_agg[key]
-            if a.valor is not None:
-                agg["valor"] += a.valor
-            if a.data_travamento and (agg["data"] is None or a.data_travamento > agg["data"]):
-                agg["data"] = a.data_travamento
-            if _norm(a.obs):
-                agg["obs"].append(a.obs.strip())
-
-        created = 0
-        updated = 0
-        all_keys = set(budget_agg) | set(actual_agg)
-
-        with transaction.atomic(), suppress_audit_signals():
-            for key in all_keys:
-                tenant_id, grupo_id, subgrupo_id, cultura_id, safra_id, moeda, grupo_despesa = key
-                b = budget_agg.get(key)
-                a = actual_agg.get(key)
-
-                seen = set()
-                obs_list = []
-                for part in (b["obs"] if b else []) + (a["obs"] if a else []):
-                    if part not in seen:
-                        seen.add(part)
-                        obs_list.append(part)
-
-                defaults = {
-                    "valor_orcado": b["valor"] if b else None,
-                    "valor_realizado": a["valor"] if a else None,
-                    "data_realizado": a["data"] if a else None,
-                    "obs": " | ".join(obs_list),
-                }
-                obj, was_created = Custo.objects.get_or_create(
-                    tenant_id=tenant_id,
-                    grupo_id=grupo_id,
-                    subgrupo_id=subgrupo_id,
-                    cultura_id=cultura_id,
-                    safra_id=safra_id,
-                    moeda=moeda,
-                    descricao=grupo_despesa,
-                    defaults=defaults,
-                )
-                if was_created:
-                    created += 1
-                else:
-                    for field, value in defaults.items():
-                        setattr(obj, field, value)
-                    obj.save(update_fields=list(defaults.keys()))
-                    updated += 1
-
-        return Response(
-            {
-                "ok": True,
-                "origem": {
-                    "budget_costs": BudgetCost.objects.count(),
-                    "actual_costs": ActualCost.objects.count(),
-                },
-                "linhas_chave": len(all_keys),
-                "custos_criados": created,
-                "custos_atualizados": updated,
-                "total_custos": Custo.objects.count(),
-            }
-        )
 
 
 class PhysicalSaleViewSet(TenantScopedModelViewSet):

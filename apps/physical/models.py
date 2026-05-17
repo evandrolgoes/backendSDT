@@ -7,6 +7,8 @@ from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
 
 class PhysicalQuote(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     cotacao = models.DecimalField(max_digits=18, decimal_places=4)
+    preco_brl = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    preco_usd = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     cultura_texto = models.CharField(max_length=100)
     data_pgto = models.DateField(null=True, blank=True)
     data_report = models.DateField(null=True, blank=True)
