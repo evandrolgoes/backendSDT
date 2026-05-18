@@ -171,6 +171,22 @@ else:
         }
     }
 
+# SQLite (dev local) trava o arquivo inteiro a cada escrita. Sem isto, escritas
+# concorrentes (ex.: salvar config de colunas para varios tenants ao mesmo tempo)
+# estouram "database is locked" -> HTTP 500. WAL permite leitor+escritor
+# simultaneos; timeout faz o writer esperar a fila; transaction_mode=IMMEDIATE
+# pega o lock de escrita no BEGIN, evitando deadlock de upgrade. Producao usa
+# Postgres e nao passa por aqui.
+if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
+    sqlite_options = DATABASES["default"].setdefault("OPTIONS", {})
+    sqlite_options.update(
+        {
+            "timeout": 20,
+            "transaction_mode": "IMMEDIATE",
+            "init_command": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
+        }
+    )
+
 AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
