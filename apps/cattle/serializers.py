@@ -16,6 +16,24 @@ class ConfinementDietSerializer(PrivacyScopedSerializerMixin, serializers.ModelS
 
 class ConfinementLotSerializer(PrivacyScopedSerializerMixin, serializers.ModelSerializer):
     # Derivados expostos como read-only para o dashboard.
+    # Modulo 1 (Hedge/Posicao):
+    arrobas_previstas = serializers.DecimalField(
+        max_digits=18, decimal_places=4, read_only=True,
+    )
+    arrobas_vendidas = serializers.DecimalField(
+        max_digits=18, decimal_places=4, read_only=True,
+    )
+    arrobas_protegidas = serializers.DecimalField(
+        max_digits=18, decimal_places=4, read_only=True,
+    )
+    arrobas_em_aberto = serializers.DecimalField(
+        max_digits=18, decimal_places=4, read_only=True,
+    )
+    pct_protegido = serializers.DecimalField(
+        max_digits=9, decimal_places=4, read_only=True,
+    )
+    cabecas_em_aberto = serializers.IntegerField(read_only=True)
+    # Fase 2 (Margem/crush):
     arrobas_saida_carcaca = serializers.DecimalField(
         max_digits=18, decimal_places=4, read_only=True,
     )
@@ -49,5 +67,7 @@ class ConfinementLotSerializer(PrivacyScopedSerializerMixin, serializers.ModelSe
         read_only_fields = [
             "created_at", "updated_at", "created_by",
             "data_saida_projetada",
+            "arrobas_previstas", "arrobas_vendidas", "arrobas_protegidas",
+            "arrobas_em_aberto", "pct_protegido", "cabecas_em_aberto",
             "arrobas_saida_carcaca", "arrobas_produzidas",
         ]

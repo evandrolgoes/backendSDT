@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date
 
 from django.contrib.contenttypes.models import ContentType
@@ -11,11 +12,12 @@ from apps.catalog.models import Exchange
 from apps.core.viewsets import TenantScopedModelViewSet
 from apps.marketdata.services import compute_sale_basis, get_ptax_usd_brl
 
-from .models import ActualCost, BudgetCost, CashPayment, Custo, PhysicalPayment, PhysicalQuote, PhysicalSale
+from .models import ActualCost, BudgetCost, CashPayment, Cotacao, Custo, PhysicalPayment, PhysicalQuote, PhysicalSale
 from .serializers import (
     ActualCostSerializer,
     BudgetCostSerializer,
     CashPaymentSerializer,
+    CotacaoSerializer,
     CustoSerializer,
     PhysicalPaymentSerializer,
     PhysicalQuoteSerializer,
@@ -27,7 +29,87 @@ class PhysicalQuoteViewSet(TenantScopedModelViewSet):
     queryset = PhysicalQuote.objects.select_related("tenant", "safra", "created_by").all()
     serializer_class = PhysicalQuoteSerializer
     filterset_fields = ["safra", "data_pgto", "data_report"]
-    search_fields = ["cultura_texto", "localidade", "moeda_unidade", "obs"]
+    search_fields = ["cultura_texto", "localidade", "obs"]
+
+    @action(detail=False, methods=["post"], url_path="consolidate")
+    def consolidate(self, request):
+        """PROVISÓRIO — mescla pares R$/U$ duplicados em uma linha só.
+
+        Mesma regra da migration 0024 (par limpo 1x R$/sc + 1x U$/sc por
+        cultura+localidade+safra+data_report+data_pgto vira uma linha; grupos
+        ambíguos são preservados), mas roda sob demanda e SÓ no tenant do
+        usuário autenticado. Botão temporário — remover depois.
+        """
+        tenant_id = getattr(request.user, "tenant_id", None)
+        if not tenant_id:
+            return Response(
+                {"detail": "Usuário sem tenant vinculado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        groups = defaultdict(list)
+        for quote in PhysicalQuote.objects.filter(tenant_id=tenant_id).iterator():
+            key = (
+                (quote.cultura_texto or "").strip(),
+                (quote.localidade or "").strip(),
+                quote.safra_id,
+                quote.data_report,
+                quote.data_pgto,
+            )
+            groups[key].append(quote)
+
+        merged = 0
+        deleted = 0
+        ambiguous = []
+
+        for key, rows in groups.items():
+            if len(rows) == 1:
+                continue
+
+            brl = [r for r in rows if (r.moeda_unidade or "").strip() == "R$/sc"]
+            usd = [r for r in rows if (r.moeda_unidade or "").strip() == "U$/sc"]
+            other = [r for r in rows if (r.moeda_unidade or "").strip() not in ("R$/sc", "U$/sc")]
+
+            if len(brl) == 1 and len(usd) == 1 and not other:
+                base = brl[0]
+                partner = usd[0]
+
+                base.preco_usd = partner.preco_usd if partner.preco_usd is not None else partner.cotacao
+                if base.preco_brl is None:
+                    base.preco_brl = base.cotacao
+
+                obs_parts = []
+                for part in [(base.obs or "").strip(), (partner.obs or "").strip()]:
+                    if part and part not in obs_parts:
+                        obs_parts.append(part)
+                base.obs = " | ".join(obs_parts)
+
+                base.save(update_fields=["preco_usd", "preco_brl", "obs"])
+                partner.delete()
+                merged += 1
+                deleted += 1
+            else:
+                ambiguous.append(
+                    {
+                        "cultura": key[0],
+                        "localidade": key[1],
+                        "safra_id": key[2],
+                        "data_report": key[3],
+                        "data_pgto": key[4],
+                        "brl": len(brl),
+                        "usd": len(usd),
+                        "outros": len(other),
+                    }
+                )
+
+        return Response(
+            {
+                "merged": merged,
+                "deleted": deleted,
+                "ambiguous_count": len(ambiguous),
+                "ambiguous": ambiguous,
+            }
+        )
 
 
 class BudgetCostViewSet(TenantScopedModelViewSet):
@@ -145,3 +227,10 @@ class CashPaymentViewSet(TenantScopedModelViewSet):
     serializer_class = CashPaymentSerializer
     filterset_fields = ["grupo", "subgrupo", "contraparte", "status", "moeda", "data_vencimento", "data_pagamento"]
     search_fields = ["descricao", "contraparte_texto", "obs", "status"]
+
+
+class CotacaoViewSet(TenantScopedModelViewSet):
+    queryset = Cotacao.objects.select_related("tenant", "safra", "created_by").all()
+    serializer_class = CotacaoSerializer
+    filterset_fields = ["safra", "data_pgto", "data_report"]
+    search_fields = ["cultura_texto", "localidade", "obs"]

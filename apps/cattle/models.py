@@ -144,8 +144,31 @@ class ConfinementLot(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         verbose_name="Regiao p/ base local vs ESALQ (reposicao em aberto)",
     )
 
+    # --- MODULO 1: Hedge / Posicao -------------------------------------
+    # Versao simples (sem GMD/dias/rendimento): conta em cabecas + @/cabeca.
+    arrobas_por_cabeca = models.DecimalField(
+        max_digits=8, decimal_places=3, null=True, blank=True,
+        verbose_name="@ previstas por cabeca (saida)",
+    )
+    cabecas_vendidas = models.PositiveIntegerField(
+        null=True, blank=True,
+        verbose_name="Cabecas ja vendidas (fisico, boi gordo)",
+    )
+    preco_venda_arroba = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True,
+        verbose_name="Preco medio de venda (R$/@)",
+    )
+    arrobas_hedge = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True,
+        verbose_name="@ travadas via BGI/B3",
+    )
+    preco_hedge_arroba = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True,
+        verbose_name="Preco medio do hedge BGI (R$/@)",
+    )
+
     # Override manual do indicador a vista enquanto o provider CEPEA/ESALQ
-    # nao existe (margem aberta).
+    # nao existe (margem aberta -- Fase 2).
     preco_boi_gordo_ref = models.DecimalField(
         max_digits=14, decimal_places=4, null=True, blank=True,
         verbose_name="Preco boi gordo a vista ref. (R$/@) -- override CEPEA",
@@ -213,6 +236,49 @@ class ConfinementLot(TenantAwareModel, CreatedByMixin, TimeStampedModel):
         if entrada is None or saida is None:
             return None
         return saida - entrada
+
+    # --- Modulo 1: derivados de posicao/hedge --------------------------
+
+    @property
+    def arrobas_previstas(self):
+        """Total de @ que o lote deve produzir (cabecas x @/cabeca)."""
+        if not (self.cabecas and self.arrobas_por_cabeca):
+            return None
+        return Decimal(self.cabecas) * Decimal(self.arrobas_por_cabeca)
+
+    @property
+    def arrobas_vendidas(self):
+        if not (self.cabecas_vendidas and self.arrobas_por_cabeca):
+            return None
+        return Decimal(self.cabecas_vendidas) * Decimal(self.arrobas_por_cabeca)
+
+    @property
+    def cabecas_em_aberto(self):
+        if self.cabecas is None:
+            return None
+        return self.cabecas - (self.cabecas_vendidas or 0)
+
+    @property
+    def arrobas_protegidas(self):
+        """Vendido fisico + hedge BGI -- ambos travam o preco do boi."""
+        vendidas = self.arrobas_vendidas or Decimal("0")
+        hedge = Decimal(self.arrobas_hedge) if self.arrobas_hedge is not None else Decimal("0")
+        return vendidas + hedge
+
+    @property
+    def arrobas_em_aberto(self):
+        """Exposicao de preco em aberto = previstas - protegidas."""
+        previstas = self.arrobas_previstas
+        if previstas is None:
+            return None
+        return previstas - self.arrobas_protegidas
+
+    @property
+    def pct_protegido(self):
+        previstas = self.arrobas_previstas
+        if not previstas:
+            return None
+        return self.arrobas_protegidas / previstas * Decimal("100")
 
     def save(self, *args, **kwargs):
         if not self.peso_saida_manual:

@@ -137,6 +137,10 @@ class CropBoard(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     producao_total = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     criar_politica_hedge = models.BooleanField(default=False)
     unidade_producao = models.CharField(max_length=20, blank=True)
+    margem_alvo = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True,
+        help_text="Margem alvo em % (ex.: 15.50 = 15,50%)",
+    )
 
     class Meta:
         ordering = ["-created_at"]

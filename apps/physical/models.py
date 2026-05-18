@@ -6,7 +6,6 @@ from apps.core.models import CreatedByMixin, TenantAwareModel, TimeStampedModel
 
 
 class PhysicalQuote(TenantAwareModel, CreatedByMixin, TimeStampedModel):
-    cotacao = models.DecimalField(max_digits=18, decimal_places=4)
     preco_brl = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     preco_usd = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     basis = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
@@ -16,7 +15,6 @@ class PhysicalQuote(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     data_pgto = models.DateField(null=True, blank=True)
     data_report = models.DateField(null=True, blank=True)
     localidade = models.CharField(max_length=120, blank=True)
-    moeda_unidade = models.CharField(max_length=30)
     safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="cotacoes_fisico")
     obs = models.TextField(blank=True)
 
@@ -176,3 +174,33 @@ class CashPayment(TenantAwareModel, CreatedByMixin, TimeStampedModel):
 
     def __str__(self):
         return self.descricao[:80] or f"Empréstimo {self.id}"
+
+
+class Cotacao(TenantAwareModel, CreatedByMixin, TimeStampedModel):
+    """Cotação física cadastrada manualmente (tabela própria `cotacoes`).
+
+    Mesmos campos do formulário de Cotações Físico, porém em tabela limpa —
+    independente da sync do Bubble e sem a coluna órfã `cotacao` que trava
+    o INSERT em physical_physicalquote.
+    """
+
+    preco_brl = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    preco_usd = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    basis = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    bolsa_basis = models.CharField(max_length=120, blank=True)
+    moeda_unidade_basis = models.CharField(max_length=30, blank=True)
+    cultura_texto = models.CharField(max_length=100)
+    data_pgto = models.DateField(null=True, blank=True)
+    data_report = models.DateField(null=True, blank=True)
+    localidade = models.CharField(max_length=120, blank=True)
+    safra = models.ForeignKey("clients.CropSeason", null=True, blank=True, on_delete=models.SET_NULL, related_name="cotacoes")
+    obs = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "cotacoes"
+        ordering = ["-data_report", "-created_at"]
+        verbose_name = "Cotação"
+        verbose_name_plural = "Cotações"
+
+    def __str__(self):
+        return f"{self.cultura_texto} - {self.data_report or self.created_at.date()}"
