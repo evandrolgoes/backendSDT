@@ -80,8 +80,20 @@ class Command(BaseCommand):
                  "(reverte os logs de auditoria gerados pelo proprio comando, user nulo). Devolve ao estado pre-revert.",
         )
         parser.add_argument("--objects", default=None, help="opcional: lista de IDs separados por virgula para restringir o escopo (ex: 706,707,742)")
+        parser.add_argument(
+            "--include-fk", action="store_true",
+            help="tambem reverte campos de relacao (FK), resolvendo o texto auditado p/ o objeto. "
+                 "FK ambiguo/nao encontrado vira revisao manual (nao grava esse campo).",
+        )
         parser.add_argument("--apply", action="store_true", help="grava as reversoes (sem isso, apenas dry-run)")
         parser.add_argument("--report", default=None, help="caminho opcional para salvar um relatorio JSON do que foi/seria feito")
+
+    def _resolve_fk(self, model_field, target_str):
+        """Acha o(s) objeto(s) do model relacionado cujo str() == texto auditado."""
+        rel = model_field.related_model
+        if rel is None:
+            return []
+        return [o for o in rel._default_manager.all() if str(o) == target_str]
 
     def _resolve_user(self, ident):
         User = get_user_model()
@@ -217,12 +229,57 @@ class Command(BaseCommand):
                     mf = DerivativeOperation._meta.get_field(fname)
 
                     if fname in fk_fields:
-                        finfo["acao"] = "REVISAO MANUAL (campo de relacao/FK)"
-                        total_manual += 1
-                        entry["fields"].append(finfo)
-                        self.stdout.write(self.style.WARNING(
-                            f"    - {fname}: FK alterada ({cur!r} -> deveria voltar p/ {target!r}) -> revisao manual"
-                        ))
+                        if not opts.get("include_fk"):
+                            finfo["acao"] = "REVISAO MANUAL (campo de relacao/FK; use --include-fk)"
+                            total_manual += 1
+                            entry["fields"].append(finfo)
+                            self.stdout.write(self.style.WARNING(
+                                f"    - {fname}: FK alterada ({cur!r} -> deveria voltar p/ {target!r}) "
+                                f"-> revisao manual (--include-fk p/ tratar)"
+                            ))
+                            continue
+                        if _eq(mf, cur, target):
+                            finfo["acao"] = "ok (FK ja esta no valor correto)"
+                            total_ok += 1
+                            entry["fields"].append(finfo)
+                            continue
+                        if not _eq(mf, cur, expected):
+                            finfo["acao"] = "REVISAO MANUAL (FK atual difere do after auditado: mexido depois)"
+                            total_manual += 1
+                            entry["fields"].append(finfo)
+                            self.stdout.write(self.style.WARNING(
+                                f"    - {fname}: FK atual={cur!r} != after auditado={expected!r} "
+                                f"-> mexido depois (revisao manual)"
+                            ))
+                            continue
+                        if target is None:
+                            updates[fname] = None
+                            finfo["fk_resolvido"] = None
+                            finfo["acao"] = "reverter FK -> None" if opts["apply"] else "reverteria FK -> None (dry-run)"
+                            total_revert += 1
+                            entry["fields"].append(finfo)
+                            self.stdout.write(f"    - {fname}: {cur!r} -> None [FK]")
+                            continue
+                        matches = self._resolve_fk(mf, target)
+                        if len(matches) == 1:
+                            updates[fname] = matches[0]
+                            finfo["fk_resolvido"] = f"{matches[0]._meta.label} id={matches[0].pk}"
+                            finfo["acao"] = "reverter FK" if opts["apply"] else "reverteria FK (dry-run)"
+                            total_revert += 1
+                            entry["fields"].append(finfo)
+                            self.stdout.write(
+                                f"    - {fname}: {cur!r} -> {target!r} "
+                                f"[FK -> {matches[0]._meta.label} id={matches[0].pk}]"
+                            )
+                        else:
+                            finfo["fk_candidatos"] = [f"{m._meta.label} id={m.pk}" for m in matches]
+                            finfo["acao"] = f"REVISAO MANUAL (FK '{target}': {len(matches)} candidato(s))"
+                            total_manual += 1
+                            entry["fields"].append(finfo)
+                            self.stdout.write(self.style.ERROR(
+                                f"    - {fname}: FK {target!r} -> {len(matches)} candidato(s) "
+                                f"{finfo['fk_candidatos']} -> REVISAO MANUAL"
+                            ))
                         continue
 
                     if _eq(mf, cur, target):
