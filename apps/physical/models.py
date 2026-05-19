@@ -100,7 +100,6 @@ class PhysicalSale(TenantAwareModel, CreatedByMixin, TimeStampedModel):
     moeda_contrato = models.CharField(max_length=20, blank=True)
     moeda_unidade = models.CharField(max_length=30, blank=True)
     objetivo_venda_dolarizada = models.CharField(max_length=120, blank=True)
-    pf_paf = models.CharField(max_length=20, blank=True)
     preco = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     unidade_contrato = models.CharField(max_length=20, null=True, blank=True)
     volume_fisico = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
