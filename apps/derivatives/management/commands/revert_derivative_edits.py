@@ -17,6 +17,10 @@ Exemplos:
   python manage.py revert_derivative_edits --user fulano@dominio.com --date 2026-05-15
   python manage.py revert_derivative_edits --user fulano@dominio.com --date 2026-05-15 --report /tmp/revert.json
   python manage.py revert_derivative_edits --user fulano@dominio.com --date 2026-05-15 --apply
+
+Desfazer um --apply anterior (devolve ao estado pre-revert; mesmo dry-run/transacao):
+  python manage.py revert_derivative_edits --undo-apply-on 2026-05-19 --objects 706,707,742,743,744,745,746,757
+  python manage.py revert_derivative_edits --undo-apply-on 2026-05-19 --objects 706,707,742,743,744,745,746,757 --apply
 """
 
 import datetime as dt
@@ -68,8 +72,14 @@ class Command(BaseCommand):
     help = "Reverte edicoes erradas de DerivativeOperation feitas por um usuario num dia (via AuditLog)."
 
     def add_arguments(self, parser):
-        parser.add_argument("--user", required=True, help="id, username ou e-mail do usuario que fez as edicoes erradas")
-        parser.add_argument("--date", required=True, help="dia das edicoes erradas, formato YYYY-MM-DD (fuso America/Sao_Paulo)")
+        parser.add_argument("--user", default=None, help="id, username ou e-mail do usuario que fez as edicoes erradas (modo reverter)")
+        parser.add_argument("--date", default=None, help="dia das edicoes erradas, formato YYYY-MM-DD (fuso America/Sao_Paulo)")
+        parser.add_argument(
+            "--undo-apply-on", default=None,
+            help="DESFAZER um --apply anterior: data YYYY-MM-DD em que este comando rodou com --apply "
+                 "(reverte os logs de auditoria gerados pelo proprio comando, user nulo). Devolve ao estado pre-revert.",
+        )
+        parser.add_argument("--objects", default=None, help="opcional: lista de IDs separados por virgula para restringir o escopo (ex: 706,707,742)")
         parser.add_argument("--apply", action="store_true", help="grava as reversoes (sem isso, apenas dry-run)")
         parser.add_argument("--report", default=None, help="caminho opcional para salvar um relatorio JSON do que foi/seria feito")
 
@@ -83,14 +93,33 @@ class Command(BaseCommand):
         return qs.filter(username=ident).first() or qs.filter(email__iexact=ident).first()
 
     def handle(self, *args, **opts):
-        user = self._resolve_user(opts["user"])
-        if not user:
-            raise CommandError(f"Usuario nao encontrado: {opts['user']!r}")
+        undo_mode = bool(opts.get("undo_apply_on"))
 
-        try:
-            day = dt.date.fromisoformat(opts["date"])
-        except ValueError:
-            raise CommandError("--date invalido; use YYYY-MM-DD")
+        if undo_mode:
+            if opts.get("user") or opts.get("date"):
+                raise CommandError("--undo-apply-on nao pode ser combinado com --user/--date.")
+            user = None
+            try:
+                day = dt.date.fromisoformat(opts["undo_apply_on"])
+            except ValueError:
+                raise CommandError("--undo-apply-on invalido; use YYYY-MM-DD")
+        else:
+            if not opts.get("user") or not opts.get("date"):
+                raise CommandError("Modo reverter exige --user e --date (ou use --undo-apply-on).")
+            user = self._resolve_user(opts["user"])
+            if not user:
+                raise CommandError(f"Usuario nao encontrado: {opts['user']!r}")
+            try:
+                day = dt.date.fromisoformat(opts["date"])
+            except ValueError:
+                raise CommandError("--date invalido; use YYYY-MM-DD")
+
+        only_ids = None
+        if opts.get("objects"):
+            try:
+                only_ids = [int(x) for x in opts["objects"].split(",") if x.strip()]
+            except ValueError:
+                raise CommandError("--objects deve ser uma lista de IDs separados por virgula")
 
         tz = timezone.get_default_timezone()
         start = timezone.make_aware(dt.datetime.combine(day, dt.time.min), tz)
@@ -99,17 +128,29 @@ class Command(BaseCommand):
         ct = ContentType.objects.get_for_model(DerivativeOperation)
         fk_fields = {f.name for f in DerivativeOperation._meta.fields if f.is_relation}
 
-        logs = list(
-            AuditLog.objects.filter(
-                content_type=ct, action=ACTION, user=user,
-                created_at__gte=start, created_at__lt=end,
-            ).order_by("object_id", "created_at")
-        )
+        log_filter = dict(content_type=ct, action=ACTION, created_at__gte=start, created_at__lt=end)
+        if undo_mode:
+            # Logs gerados pelo proprio comando ao rodar --apply (sem request user).
+            log_filter["user__isnull"] = True
+        else:
+            log_filter["user"] = user
+        if only_ids is not None:
+            log_filter["object_id__in"] = only_ids
 
-        self.stdout.write(
-            f"Usuario: {user} (id={user.pk}) | dia {day.isoformat()} "
-            f"({start.isoformat()} -> {end.isoformat()})"
-        )
+        logs = list(AuditLog.objects.filter(**log_filter).order_by("object_id", "created_at"))
+
+        if undo_mode:
+            self.stdout.write(
+                f"MODO DESFAZER --apply de {day.isoformat()} "
+                f"({start.isoformat()} -> {end.isoformat()}) | logs com user nulo"
+            )
+        else:
+            self.stdout.write(
+                f"Usuario: {user} (id={user.pk}) | dia {day.isoformat()} "
+                f"({start.isoformat()} -> {end.isoformat()})"
+            )
+        if only_ids is not None:
+            self.stdout.write(f"Escopo restrito aos IDs: {only_ids}")
         self.stdout.write(f"Logs 'alterado' de DerivativeOperation nesse recorte: {len(logs)}")
         if not logs:
             self.stdout.write(self.style.WARNING("Nada a fazer."))
@@ -120,7 +161,11 @@ class Command(BaseCommand):
             by_obj.setdefault(log.object_id, []).append(log)
 
         report = {
-            "user": str(user), "user_id": user.pk, "date": day.isoformat(),
+            "mode": "undo" if undo_mode else "revert",
+            "user": str(user) if user else None,
+            "user_id": user.pk if user else None,
+            "date": day.isoformat(),
+            "objects_filter": only_ids,
             "apply": bool(opts["apply"]), "objects": [],
         }
         total_revert = total_manual = total_ok = total_missing = 0
