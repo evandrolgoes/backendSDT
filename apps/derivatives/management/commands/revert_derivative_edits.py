@@ -282,17 +282,19 @@ class Command(BaseCommand):
                         if len(tm) == 1:
                             tenant_resolved = tm[0]
 
-                    # Operacao irma viva no mesmo cod_operacao_mae -> dica
-                    # para desempatar FKs duplicadas dentro do mesmo tenant
-                    # (ex.: 9 'Frankanna' no admin; a irma sabe a certa).
-                    sibling_op = None
+                    # Pool de operacoes irmas vivas no mesmo cod_operacao_mae.
+                    # Iteramos elas procurando uma cujo str(FK) bata com o
+                    # texto auditado — desempata FK duplicada dentro do mesmo
+                    # tenant (ex.: 9 'Frankanna' no admin, mas 731 referencia
+                    # outro grupo; 742 referencia o grupo Frankanna correto).
+                    sibling_pool = []
                     cod_mae_val = pre_state.get("cod_operacao_mae")
                     if cod_mae_val:
-                        sibling_op = (
+                        sibling_pool = list(
                             DerivativeOperation.objects
                             .filter(cod_operacao_mae=cod_mae_val)
                             .exclude(pk=object_id)
-                            .first()
+                            .select_related(*[f.name for f in DerivativeOperation._meta.fields if f.is_relation])
                         )
 
                     prepared = {}
@@ -305,9 +307,13 @@ class Command(BaseCommand):
                             if value is None:
                                 prepared[fname] = None
                                 continue
-                            sibling_hint_id = (
-                                getattr(sibling_op, f"{fname}_id", None) if sibling_op else None
-                            )
+                            # Acha uma irma cuja str(FK) == valor auditado
+                            sibling_hint_id = None
+                            for sib in sibling_pool:
+                                sib_fk = getattr(sib, fname, None)
+                                if sib_fk is not None and str(sib_fk) == value:
+                                    sibling_hint_id = sib_fk.pk
+                                    break
                             matches = self._resolve_fk(
                                 mf, value,
                                 tenant_obj=tenant_resolved,
