@@ -93,12 +93,26 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true", help="grava as reversoes (sem isso, apenas dry-run)")
         parser.add_argument("--report", default=None, help="caminho opcional para salvar um relatorio JSON do que foi/seria feito")
 
-    def _resolve_fk(self, model_field, target_str):
-        """Acha o(s) objeto(s) do model relacionado cujo str() == texto auditado."""
+    def _resolve_fk(self, model_field, target_str, tenant_obj=None):
+        """Acha o(s) objeto(s) do model relacionado cujo str() == texto auditado.
+
+        Se houver multiplos candidatos e tenant_obj for fornecido, filtra pelos
+        que pertencem aquele tenant (desempate natural em base multi-tenant
+        — TenantAwareModel guarda um campo `tenant`).
+        """
         rel = model_field.related_model
         if rel is None:
             return []
-        return [o for o in rel._default_manager.all() if str(o) == target_str]
+        candidates = [o for o in rel._default_manager.all() if str(o) == target_str]
+        if tenant_obj is not None and len(candidates) > 1:
+            try:
+                rel._meta.get_field("tenant")
+            except Exception:
+                return candidates
+            filtered = [o for o in candidates if getattr(o, "tenant_id", None) == tenant_obj.pk]
+            if filtered:
+                return filtered
+        return candidates
 
     def _resolve_user(self, ident):
         User = get_user_model()
@@ -250,6 +264,17 @@ class Command(BaseCommand):
                         continue
 
                     model_field_names = {f.name for f in DerivativeOperation._meta.fields}
+
+                    # Resolve o tenant primeiro -> usado como desempate nas
+                    # outras FKs multi-tenant (Counterparty/CropSeason/etc.).
+                    tenant_resolved = None
+                    tenant_val = pre_state.get("tenant")
+                    if tenant_val is not None:
+                        tenant_field = DerivativeOperation._meta.get_field("tenant")
+                        tm = self._resolve_fk(tenant_field, tenant_val)
+                        if len(tm) == 1:
+                            tenant_resolved = tm[0]
+
                     prepared = {}
                     blockers = []
                     for fname, value in pre_state.items():
@@ -260,7 +285,7 @@ class Command(BaseCommand):
                             if value is None:
                                 prepared[fname] = None
                                 continue
-                            matches = self._resolve_fk(mf, value)
+                            matches = self._resolve_fk(mf, value, tenant_obj=tenant_resolved)
                             if len(matches) == 1:
                                 prepared[fname] = matches[0]
                             else:
@@ -359,7 +384,7 @@ class Command(BaseCommand):
                             entry["fields"].append(finfo)
                             self.stdout.write(f"    - {fname}: {cur!r} -> None [FK]")
                             continue
-                        matches = self._resolve_fk(mf, target)
+                        matches = self._resolve_fk(mf, target, tenant_obj=getattr(obj, "tenant", None))
                         if len(matches) == 1:
                             updates[fname] = matches[0]
                             finfo["fk_resolvido"] = f"{matches[0]._meta.label} id={matches[0].pk}"
