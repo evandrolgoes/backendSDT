@@ -93,12 +93,15 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true", help="grava as reversoes (sem isso, apenas dry-run)")
         parser.add_argument("--report", default=None, help="caminho opcional para salvar um relatorio JSON do que foi/seria feito")
 
-    def _resolve_fk(self, model_field, target_str, tenant_obj=None):
+    def _resolve_fk(self, model_field, target_str, tenant_obj=None, sibling_hint_id=None):
         """Acha o(s) objeto(s) do model relacionado cujo str() == texto auditado.
 
-        Se houver multiplos candidatos e tenant_obj for fornecido, filtra pelos
-        que pertencem aquele tenant (desempate natural em base multi-tenant
-        — TenantAwareModel guarda um campo `tenant`).
+        Desempates em ordem:
+          1. tenant_obj (se fornecido) -> filtra pelos do mesmo tenant
+             (TenantAwareModel).
+          2. sibling_hint_id (se fornecido) -> se ainda houver duplicidade,
+             pega o candidato com aquele PK (vindo de uma operacao irma viva
+             que ja referencia o objeto correto).
         """
         rel = model_field.related_model
         if rel is None:
@@ -107,11 +110,15 @@ class Command(BaseCommand):
         if tenant_obj is not None and len(candidates) > 1:
             try:
                 rel._meta.get_field("tenant")
+                filtered = [o for o in candidates if getattr(o, "tenant_id", None) == tenant_obj.pk]
+                if filtered:
+                    candidates = filtered
             except Exception:
-                return candidates
-            filtered = [o for o in candidates if getattr(o, "tenant_id", None) == tenant_obj.pk]
-            if filtered:
-                return filtered
+                pass
+        if sibling_hint_id is not None and len(candidates) > 1:
+            matched = [o for o in candidates if o.pk == sibling_hint_id]
+            if matched:
+                return matched
         return candidates
 
     def _resolve_user(self, ident):
@@ -275,6 +282,19 @@ class Command(BaseCommand):
                         if len(tm) == 1:
                             tenant_resolved = tm[0]
 
+                    # Operacao irma viva no mesmo cod_operacao_mae -> dica
+                    # para desempatar FKs duplicadas dentro do mesmo tenant
+                    # (ex.: 9 'Frankanna' no admin; a irma sabe a certa).
+                    sibling_op = None
+                    cod_mae_val = pre_state.get("cod_operacao_mae")
+                    if cod_mae_val:
+                        sibling_op = (
+                            DerivativeOperation.objects
+                            .filter(cod_operacao_mae=cod_mae_val)
+                            .exclude(pk=object_id)
+                            .first()
+                        )
+
                     prepared = {}
                     blockers = []
                     for fname, value in pre_state.items():
@@ -285,7 +305,14 @@ class Command(BaseCommand):
                             if value is None:
                                 prepared[fname] = None
                                 continue
-                            matches = self._resolve_fk(mf, value, tenant_obj=tenant_resolved)
+                            sibling_hint_id = (
+                                getattr(sibling_op, f"{fname}_id", None) if sibling_op else None
+                            )
+                            matches = self._resolve_fk(
+                                mf, value,
+                                tenant_obj=tenant_resolved,
+                                sibling_hint_id=sibling_hint_id,
+                            )
                             if len(matches) == 1:
                                 prepared[fname] = matches[0]
                             else:
